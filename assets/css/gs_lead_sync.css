@@ -1,0 +1,30 @@
+/* gs_lead_sync module styles */
+
+#gs-mapping-table select.form-control {
+    padding: 4px 8px;
+    height: 30px;
+    font-size: 12px;
+}
+
+#gs-mapping-table td {
+    vertical-align: middle;
+}
+
+#gs-description-columns .checkbox {
+    margin-top: 4px;
+    margin-bottom: 4px;
+}
+
+#gs-detect-status {
+    font-size: 13px;
+    vertical-align: middle;
+}
+
+.gs-sync-result {
+    font-size: 12px;
+    margin-top: 4px;
+}
+
+.label-success { background-color: #5cb85c; }
+.label-danger  { background-color: #d9534f; }
+.label-info    { background-color: #5bc0de; }
