@@ -1,0 +1,26 @@
+# Claude Code session files
+.claude/
+
+# Project planning docs
+*.docx
+GS_Lead_Sync_Module_Masterplan.docx
+
+# Composer dependencies
+vendor/
+composer.lock
+
+# IDE & editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# PHP environment
+.env
+*.log
