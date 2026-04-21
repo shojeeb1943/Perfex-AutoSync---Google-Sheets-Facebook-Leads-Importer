@@ -1,6 +1,10 @@
 <?php
 defined('BASEPATH') or exit('No direct script access allowed');
 
+// TEMP DEBUG — remove after finding error
+@ini_set('display_errors', 1);
+@error_reporting(E_ALL);
+
 /*
 Module Name: Google Sheets Lead Sync
 Description: Auto-import Facebook Ads leads from Google Sheets into Perfex CRM
