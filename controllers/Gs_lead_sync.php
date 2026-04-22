@@ -1,15 +1,21 @@
 <?php
 defined('BASEPATH') or exit('No direct script access allowed');
 
-require_once GS_LEAD_SYNC_DIR . 'libraries/LeadMapper.php';
-require_once GS_LEAD_SYNC_DIR . 'libraries/GoogleSheetsClient.php';
-require_once GS_LEAD_SYNC_DIR . 'libraries/SyncEngine.php';
-
 class Gs_lead_sync extends AdminController
 {
     public function __construct()
     {
         parent::__construct();
+
+        require_once GS_LEAD_SYNC_DIR . 'libraries/LeadMapper.php';
+        require_once GS_LEAD_SYNC_DIR . 'libraries/GoogleSheetsClient.php';
+        require_once GS_LEAD_SYNC_DIR . 'libraries/SyncEngine.php';
+
+        if (!$this->db->table_exists(db_prefix() . 'gs_lead_sync_sheets')) {
+            require_once GS_LEAD_SYNC_DIR . 'migrations/001_install_gs_lead_sync.php';
+            gs_lead_sync_install();
+        }
+
         $this->load->model('gs_lead_sync/SheetConfigModel', 'sheet_config_model');
         $this->load->model('gs_lead_sync/SyncLogModel', 'sync_log_model');
     }

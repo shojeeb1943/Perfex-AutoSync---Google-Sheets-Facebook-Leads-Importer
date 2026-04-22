@@ -1,10 +1,6 @@
 <?php
 defined('BASEPATH') or exit('No direct script access allowed');
 
-// TEMP DEBUG — remove after finding error
-@ini_set('display_errors', 1);
-@error_reporting(E_ALL);
-
 /*
 Module Name: Google Sheets Lead Sync
 Description: Auto-import Facebook Ads leads from Google Sheets into Perfex CRM
@@ -17,22 +13,14 @@ Author URI: https://bytesis.com
 define('GS_LEAD_SYNC_MODULE_NAME', 'gs_lead_sync');
 define('GS_LEAD_SYNC_VERSION',     '1.2.0');
 define('GS_LEAD_SYNC_DIR',         dirname(__FILE__) . '/');
-define('GS_LEAD_SYNC_URI',         base_url('modules/gs_lead_sync/'));
 
 register_language_files(GS_LEAD_SYNC_MODULE_NAME, [GS_LEAD_SYNC_MODULE_NAME]);
 
 register_activation_hook(GS_LEAD_SYNC_MODULE_NAME,   'gs_lead_sync_activation_hook');
 register_deactivation_hook(GS_LEAD_SYNC_MODULE_NAME, 'gs_lead_sync_deactivation_hook');
 
-hooks()->add_action('app_admin_head', 'gs_lead_sync_assets');
-hooks()->add_action('app_cron',       'gs_lead_sync_cron');
-hooks()->add_action('admin_init',     'gs_lead_sync_menu');
-
-function gs_lead_sync_assets()
-{
-    echo '<link rel="stylesheet" href="' . GS_LEAD_SYNC_URI . 'assets/css/gs_lead_sync.css">' . "\n";
-    echo '<script src="' . GS_LEAD_SYNC_URI . 'assets/js/gs_lead_sync.js"></script>' . "\n";
-}
+hooks()->add_action('app_cron',   'gs_lead_sync_cron');
+hooks()->add_action('admin_init', 'gs_lead_sync_menu');
 
 function gs_lead_sync_menu()
 {
@@ -52,6 +40,9 @@ function gs_lead_sync_cron()
     if (get_option('gs_lead_sync_cron_enabled') != '1') {
         return;
     }
+    $CI = &get_instance();
+    $CI->load->model('gs_lead_sync/SheetConfigModel', 'sheet_config_model');
+    $CI->load->model('gs_lead_sync/SyncLogModel', 'sync_log_model');
     require_once GS_LEAD_SYNC_DIR . 'libraries/LeadMapper.php';
     require_once GS_LEAD_SYNC_DIR . 'libraries/GoogleSheetsClient.php';
     require_once GS_LEAD_SYNC_DIR . 'libraries/SyncEngine.php';

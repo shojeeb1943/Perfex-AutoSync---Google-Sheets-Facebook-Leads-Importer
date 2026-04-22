@@ -1,9 +1,6 @@
 <?php
 defined('BASEPATH') or exit('No direct script access allowed');
 
-require_once dirname(__FILE__) . '/LeadMapper.php';
-require_once dirname(__FILE__) . '/GoogleSheetsClient.php';
-
 class SyncEngine
 {
     private $CI;
@@ -11,8 +8,6 @@ class SyncEngine
     public function __construct()
     {
         $this->CI = &get_instance();
-        $this->CI->load->model('gs_lead_sync/SheetConfigModel', 'sheet_config_model');
-        $this->CI->load->model('gs_lead_sync/SyncLogModel', 'sync_log_model');
     }
 
     public function sync_all($triggered_by = 'cron')
