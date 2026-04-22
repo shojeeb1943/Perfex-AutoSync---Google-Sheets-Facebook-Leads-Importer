@@ -23,10 +23,14 @@ class Gs_lead_sync extends AdminController
         $data['lead_sources']  = $q ? $q->result_array() : [];
         $data['title']         = 'Google Sheets Lead Sync';
 
-        $data['service_account_set'] = (get_option('gs_lead_sync_service_account_json') != '');
-        $data['cron_enabled']        = get_option('gs_lead_sync_cron_enabled');
-        $data['cron_interval']       = get_option('gs_lead_sync_cron_interval');
-        $data['skip_test_leads']     = get_option('gs_lead_sync_skip_test_leads');
+        $sa_json = get_option('gs_lead_sync_service_account_json');
+        $sa_data = $sa_json ? json_decode($sa_json, true) : null;
+        $data['service_account_set']   = !empty($sa_json);
+        $data['service_account_email'] = $sa_data['client_email'] ?? '';
+        $data['service_account_project'] = $sa_data['project_id'] ?? '';
+        $data['cron_enabled']          = get_option('gs_lead_sync_cron_enabled');
+        $data['cron_interval']         = get_option('gs_lead_sync_cron_interval');
+        $data['skip_test_leads']       = get_option('gs_lead_sync_skip_test_leads');
 
         $this->load->view('gs_lead_sync/settings/index', $data);
     }

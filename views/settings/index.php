@@ -9,6 +9,43 @@
       </div>
     </div>
 
+    <div class="row" style="margin-bottom:16px;">
+      <div class="col-md-12">
+        <div style="display:flex;align-items:center;flex-wrap:wrap;gap:10px;padding:10px 16px;background:#f8f9fa;border:1px solid #e3e6ea;border-radius:6px;font-size:13px;color:#555;">
+          <span style="display:flex;align-items:center;gap:5px;">
+            <i class="fa fa-tag" style="color:#4285f4;"></i>
+            <strong style="color:#333;">Version</strong>&nbsp;<span class="label label-info" style="font-size:12px;vertical-align:middle;">v<?php echo defined('GS_LEAD_SYNC_VERSION') ? GS_LEAD_SYNC_VERSION : '1.2.0'; ?></span>
+          </span>
+          <span style="color:#ccc;">|</span>
+          <span style="display:flex;align-items:center;gap:5px;">
+            <i class="fa fa-info-circle" style="color:#34a853;"></i>
+            Auto-import Facebook Ads leads from Google Sheets into Perfex CRM
+          </span>
+          <span style="color:#ccc;">|</span>
+          <span style="display:flex;align-items:center;gap:5px;">
+            <i class="fa fa-user-o" style="color:#888;"></i>
+            <strong style="color:#333;">Author:</strong>&nbsp;Bytesis
+          </span>
+          <span style="color:#ccc;">|</span>
+          <span style="display:flex;align-items:center;gap:5px;">
+            <i class="fa fa-perfex fa-clock-o" style="color:#888;"></i>
+            <strong style="color:#333;">Requires Perfex:</strong>&nbsp;2.3+
+          </span>
+          <?php if (!defined('GS_LEAD_SYNC_SERVICE_ACCOUNT_SET') && empty($service_account_set)): ?>
+          <span style="margin-left:auto;display:flex;align-items:center;gap:5px;color:#e67e22;">
+            <i class="fa fa-exclamation-triangle"></i>
+            Setup not complete &mdash; configure your Google Service Account in <strong>Global Settings</strong>
+          </span>
+          <?php else: ?>
+          <span style="margin-left:auto;display:flex;align-items:center;gap:5px;color:#27ae60;">
+            <i class="fa fa-check-circle"></i>
+            Google account connected &amp; ready
+          </span>
+          <?php endif; ?>
+        </div>
+      </div>
+    </div>
+
   <ul class="nav nav-tabs" role="tablist">
     <li role="presentation" class="active">
       <a href="#tab-sheets" data-toggle="tab">Sheet Configurations</a>
@@ -111,7 +148,27 @@
             <div class="form-group">
               <label>Google Service Account JSON</label>
               <?php if ($service_account_set): ?>
-                <p class="text-success"><i class="fa fa-check"></i> Service account is configured. Paste a new JSON below to replace it.</p>
+                <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:#f0faf4;border:1px solid #b2dfdb;border-radius:6px;margin-bottom:10px;">
+                  <div style="width:38px;height:38px;border-radius:50%;background:#fff;border:2px solid #34a853;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <i class="fa fa-google" style="color:#34a853;font-size:18px;"></i>
+                  </div>
+                  <div style="flex:1;min-width:0;">
+                    <div style="font-weight:600;color:#1a7340;font-size:13px;margin-bottom:2px;">
+                      <i class="fa fa-check-circle" style="color:#34a853;margin-right:4px;"></i>Connected Google Service Account
+                    </div>
+                    <?php if ($service_account_email): ?>
+                      <div style="color:#333;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                        <i class="fa fa-envelope-o" style="color:#888;margin-right:4px;"></i><?php echo htmlspecialchars($service_account_email); ?>
+                      </div>
+                    <?php endif; ?>
+                    <?php if ($service_account_project): ?>
+                      <div style="color:#666;font-size:12px;margin-top:2px;">
+                        <i class="fa fa-folder-o" style="color:#aaa;margin-right:4px;"></i>Project: <?php echo htmlspecialchars($service_account_project); ?>
+                      </div>
+                    <?php endif; ?>
+                  </div>
+                </div>
+                <small class="text-muted" style="display:block;margin-bottom:6px;">Paste a new JSON below to replace the connected account.</small>
               <?php else: ?>
                 <p class="text-warning"><i class="fa fa-warning"></i> Not configured yet. Paste your Google Service Account JSON key below.</p>
               <?php endif; ?>
@@ -135,21 +192,17 @@
             </div>
 
             <div class="form-group">
-              <div class="checkbox">
-                <label>
-                  <input type="checkbox" name="cron_enabled" value="1" <?php echo $cron_enabled == '1' ? 'checked' : ''; ?>>
-                  Enable automatic cron sync
-                </label>
-              </div>
+              <label style="font-weight:normal;cursor:pointer;display:flex;align-items:center;gap:8px;">
+                <input type="checkbox" name="cron_enabled" value="1" style="width:16px;height:16px;flex-shrink:0;cursor:pointer;" <?php echo $cron_enabled == '1' ? 'checked' : ''; ?>>
+                Enable automatic cron sync
+              </label>
             </div>
 
             <div class="form-group">
-              <div class="checkbox">
-                <label>
-                  <input type="checkbox" name="skip_test_leads" value="1" <?php echo $skip_test_leads != '0' ? 'checked' : ''; ?>>
-                  Skip Facebook test leads (rows containing <code>&lt;test lead:</code> markers)
-                </label>
-              </div>
+              <label style="font-weight:normal;cursor:pointer;display:flex;align-items:center;gap:8px;">
+                <input type="checkbox" name="skip_test_leads" value="1" style="width:16px;height:16px;flex-shrink:0;cursor:pointer;" <?php echo $skip_test_leads != '0' ? 'checked' : ''; ?>>
+                Skip Facebook test leads (rows containing <code>&lt;test lead:</code> markers)
+              </label>
             </div>
 
             <button type="submit" class="btn btn-primary">Save Settings</button>
