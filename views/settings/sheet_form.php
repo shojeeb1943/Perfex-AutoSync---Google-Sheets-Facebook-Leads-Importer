@@ -1,14 +1,13 @@
 <?php defined('BASEPATH') or exit('No direct script access allowed'); ?>
 <?php init_head(); ?>
 <div id="wrapper">
-  <?php $this->load->view('includes/header_wrapper_start'); ?>
-
-  <div class="row">
-    <div class="col-md-12">
-      <h4 class="font-bold"><?php echo $title; ?></h4>
-      <hr class="hr-panel-heading" />
+  <div class="content">
+    <div class="row">
+      <div class="col-md-12">
+        <h4 class="font-bold"><?php echo $title; ?></h4>
+        <hr class="hr-panel-heading" />
+      </div>
     </div>
-  </div>
 
   <?php
   // Safe defaults when adding a new sheet ($sheet is null)
@@ -63,6 +62,49 @@
               <i class="fa fa-search"></i> Detect Columns
             </button>
             <span id="gs-detect-status" class="text-muted mleft5"></span>
+
+          </div>
+        </div>
+
+        <div class="panel panel-default">
+          <div class="panel-heading"><h4 class="panel-title">Lead Assignment</h4></div>
+          <div class="panel-body">
+
+            <div class="form-group">
+              <label>Lead Status for New Leads</label>
+              <select name="lead_status_id" class="form-control">
+                <option value="">— Select —</option>
+                <?php foreach ($lead_statuses as $ls): ?>
+                <option value="<?php echo $ls['id']; ?>"
+                  <?php echo ($s_status_id == $ls['id']) ? 'selected' : ''; ?>>
+                  <?php echo htmlspecialchars($ls['name']); ?>
+                </option>
+                <?php endforeach; ?>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label>Lead Source for New Leads</label>
+              <select name="lead_source_id" class="form-control">
+                <option value="">— Select —</option>
+                <?php foreach ($lead_sources as $ls): ?>
+                <option value="<?php echo $ls['id']; ?>"
+                  <?php echo ($s_source_id == $ls['id']) ? 'selected' : ''; ?>>
+                  <?php echo htmlspecialchars($ls['name']); ?>
+                </option>
+                <?php endforeach; ?>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <div class="checkbox">
+                <label>
+                  <input type="checkbox" name="is_active" value="1"
+                    <?php echo $s_is_active ? 'checked' : ''; ?>>
+                  Active (include in sync runs)
+                </label>
+              </div>
+            </div>
 
           </div>
         </div>
@@ -133,7 +175,7 @@
           </div>
 
           <div class="panel panel-default">
-            <div class="panel-heading"><h4 class="panel-title">Lead Assignment</h4></div>
+            <div class="panel-heading"><h4 class="panel-title">Unique ID Column</h4></div>
             <div class="panel-body">
 
               <div class="form-group">
@@ -144,42 +186,6 @@
                   </option>
                 </select>
                 <small class="text-muted">Column containing the unique Facebook lead ID (values like l:995195976...).</small>
-              </div>
-
-              <div class="form-group">
-                <label>Lead Status for New Leads</label>
-                <select name="lead_status_id" class="form-control">
-                  <option value="">— Select —</option>
-                  <?php foreach ($lead_statuses as $ls): ?>
-                  <option value="<?php echo $ls['id']; ?>"
-                    <?php echo ($s_status_id == $ls['id']) ? 'selected' : ''; ?>>
-                    <?php echo htmlspecialchars($ls['name']); ?>
-                  </option>
-                  <?php endforeach; ?>
-                </select>
-              </div>
-
-              <div class="form-group">
-                <label>Lead Source for New Leads</label>
-                <select name="lead_source_id" class="form-control">
-                  <option value="">— Select —</option>
-                  <?php foreach ($lead_sources as $ls): ?>
-                  <option value="<?php echo $ls['id']; ?>"
-                    <?php echo ($s_source_id == $ls['id']) ? 'selected' : ''; ?>>
-                    <?php echo htmlspecialchars($ls['name']); ?>
-                  </option>
-                  <?php endforeach; ?>
-                </select>
-              </div>
-
-              <div class="form-group">
-                <div class="checkbox">
-                  <label>
-                    <input type="checkbox" name="is_active" value="1"
-                      <?php echo $s_is_active ? 'checked' : ''; ?>>
-                    Active (include in sync runs)
-                  </label>
-                </div>
               </div>
 
             </div>
@@ -198,7 +204,7 @@
     </div>
   </form>
 
-  <?php $this->load->view('includes/footer_wrapper'); ?>
+  </div><!-- /content -->
 </div>
 
 <script>

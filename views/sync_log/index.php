@@ -1,14 +1,13 @@
 <?php defined('BASEPATH') or exit('No direct script access allowed'); ?>
 <?php init_head(); ?>
 <div id="wrapper">
-  <?php $this->load->view('includes/header_wrapper_start'); ?>
-
-  <div class="row">
-    <div class="col-md-12">
-      <h4 class="font-bold"><?php echo $title; ?></h4>
-      <hr class="hr-panel-heading" />
+  <div class="content">
+    <div class="row">
+      <div class="col-md-12">
+        <h4 class="font-bold"><?php echo $title; ?></h4>
+        <hr class="hr-panel-heading" />
+      </div>
     </div>
-  </div>
 
   <div class="row mbottom15">
     <div class="col-md-12">
@@ -116,6 +115,6 @@
 
   <?php endif; ?>
 
-  <?php $this->load->view('includes/footer_wrapper'); ?>
+  </div><!-- /content -->
 </div>
 <?php init_tail(); ?>
