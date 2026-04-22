@@ -206,8 +206,8 @@ gs_lead_sync/
 │   └── Gs_lead_sync.php          # Admin controller (12 actions)
 │
 ├── models/
-│   ├── SheetConfigModel.php      # Sheet config CRUD
-│   └── SyncLogModel.php          # Sync logs & deduplication
+│   ├── Sheet_config_model.php    # Sheet config CRUD
+│   └── Sync_log_model.php        # Sync logs & deduplication
 │
 ├── libraries/
 │   ├── GoogleSheetsClient.php    # Google Sheets API v4 client (JWT auth)

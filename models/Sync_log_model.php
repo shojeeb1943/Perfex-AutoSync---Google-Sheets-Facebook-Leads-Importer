@@ -1,7 +1,7 @@
 <?php
 defined('BASEPATH') or exit('No direct script access allowed');
 
-class SyncLogModel extends App_Model
+class Sync_log_model extends App_Model
 {
     public function __construct()
     {
@@ -34,17 +34,20 @@ class SyncLogModel extends App_Model
 
     public function get_logs($limit = 50, $offset = 0)
     {
-        $this->db->select('l.*, s.name as sheet_name');
-        $this->db->from(db_prefix() . 'gs_lead_sync_logs l');
-        $this->db->join(db_prefix() . 'gs_lead_sync_sheets s', 's.id = l.sheet_config_id', 'left');
-        $this->db->order_by('l.id', 'DESC');
-        $this->db->limit($limit, $offset);
-        return $this->db->get()->result_array();
+        $q = $this->db->query(
+            'SELECT l.*, s.name AS sheet_name
+             FROM ' . db_prefix() . 'gs_lead_sync_logs l
+             LEFT JOIN ' . db_prefix() . 'gs_lead_sync_sheets s ON s.id = l.sheet_config_id
+             ORDER BY l.id DESC
+             LIMIT ' . (int)$limit . ' OFFSET ' . (int)$offset
+        );
+        return $q ? $q->result_array() : [];
     }
 
     public function count_logs()
     {
-        return $this->db->count_all_results(db_prefix() . 'gs_lead_sync_logs');
+        $q = $this->db->query('SELECT COUNT(*) AS cnt FROM ' . db_prefix() . 'gs_lead_sync_logs');
+        return $q ? (int)$q->row()->cnt : 0;
     }
 
     public function clear_logs()

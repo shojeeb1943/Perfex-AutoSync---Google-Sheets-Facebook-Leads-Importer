@@ -1,7 +1,7 @@
 <?php
 defined('BASEPATH') or exit('No direct script access allowed');
 
-class SheetConfigModel extends App_Model
+class Sheet_config_model extends App_Model
 {
     public function __construct()
     {
@@ -10,17 +10,20 @@ class SheetConfigModel extends App_Model
 
     public function get_all()
     {
-        return $this->db->get(db_prefix() . 'gs_lead_sync_sheets')->result_array();
+        $q = $this->db->get(db_prefix() . 'gs_lead_sync_sheets');
+        return $q ? $q->result_array() : [];
     }
 
     public function get($id)
     {
-        return $this->db->where('id', $id)->get(db_prefix() . 'gs_lead_sync_sheets')->row_array();
+        $q = $this->db->where('id', $id)->get(db_prefix() . 'gs_lead_sync_sheets');
+        return $q ? $q->row_array() : null;
     }
 
     public function get_active_sheets()
     {
-        return $this->db->where('is_active', 1)->get(db_prefix() . 'gs_lead_sync_sheets')->result_array();
+        $q = $this->db->where('is_active', 1)->get(db_prefix() . 'gs_lead_sync_sheets');
+        return $q ? $q->result_array() : [];
     }
 
     public function insert($data)

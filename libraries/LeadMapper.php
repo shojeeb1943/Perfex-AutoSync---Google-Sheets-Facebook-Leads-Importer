@@ -9,18 +9,14 @@ class LeadMapper
         'email'       => 'Email Address',
         'phonenumber' => 'Phone Number',
         'company'     => 'Company',
-        'position'    => 'Position / Job Title',
+        'title'       => 'Title / Job Title',
         'address'     => 'Address',
         'city'        => 'City',
         'country'     => 'Country',
         'zip'         => 'Zip Code',
         'website'     => 'Website',
         'lead_value'  => 'Lead Value',
-        'note'        => 'Note 1',
-        'note2'       => 'Note 2',
-        'note3'       => 'Note 3',
-        'note4'       => 'Note 4',
-        'note5'       => 'Note 5',
+        'description' => 'Description / Notes',
     ];
 
     /**

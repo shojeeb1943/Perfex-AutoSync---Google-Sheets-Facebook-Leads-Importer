@@ -7,17 +7,8 @@ class Gs_lead_sync extends AdminController
     {
         parent::__construct();
 
-        require_once GS_LEAD_SYNC_DIR . 'libraries/LeadMapper.php';
-        require_once GS_LEAD_SYNC_DIR . 'libraries/GoogleSheetsClient.php';
-        require_once GS_LEAD_SYNC_DIR . 'libraries/SyncEngine.php';
-
-        if (!$this->db->table_exists(db_prefix() . 'gs_lead_sync_sheets')) {
-            require_once GS_LEAD_SYNC_DIR . 'migrations/001_install_gs_lead_sync.php';
-            gs_lead_sync_install();
-        }
-
-        $this->load->model('gs_lead_sync/SheetConfigModel', 'sheet_config_model');
-        $this->load->model('gs_lead_sync/SyncLogModel', 'sync_log_model');
+        $this->load->model('gs_lead_sync/sheet_config_model');
+        $this->load->model('gs_lead_sync/sync_log_model');
     }
 
     public function index()
@@ -25,8 +16,11 @@ class Gs_lead_sync extends AdminController
         if (!is_admin()) { show_404(); }
 
         $data['sheets']        = $this->sheet_config_model->get_all();
-        $data['lead_statuses'] = $this->db->get(db_prefix() . 'leads_status')->result_array();
-        $data['lead_sources']  = $this->db->get(db_prefix() . 'leads_sources')->result_array();
+
+        $q = $this->db->get(db_prefix() . 'leads_status');
+        $data['lead_statuses'] = $q ? $q->result_array() : [];
+        $q = $this->db->get(db_prefix() . 'leads_sources');
+        $data['lead_sources']  = $q ? $q->result_array() : [];
         $data['title']         = 'Google Sheets Lead Sync';
 
         $data['service_account_set'] = (get_option('gs_lead_sync_service_account_json') != '');
@@ -63,10 +57,13 @@ class Gs_lead_sync extends AdminController
     public function add_sheet()
     {
         if (!is_admin()) { show_404(); }
+        require_once GS_LEAD_SYNC_DIR . 'libraries/LeadMapper.php';
 
+        $q = $this->db->get(db_prefix() . 'leads_status');
+        $data['lead_statuses'] = $q ? $q->result_array() : [];
+        $q = $this->db->get(db_prefix() . 'leads_sources');
+        $data['lead_sources']  = $q ? $q->result_array() : [];
         $data['sheet']         = null;
-        $data['lead_statuses'] = $this->db->get(db_prefix() . 'leads_status')->result_array();
-        $data['lead_sources']  = $this->db->get(db_prefix() . 'leads_sources')->result_array();
         $data['crm_fields']    = LeadMapper::$crm_fields;
         $data['title']         = 'Add Sheet Configuration';
 
@@ -76,6 +73,7 @@ class Gs_lead_sync extends AdminController
     public function edit_sheet($id)
     {
         if (!is_admin()) { show_404(); }
+        require_once GS_LEAD_SYNC_DIR . 'libraries/LeadMapper.php';
 
         $sheet = $this->sheet_config_model->get($id);
         if (!$sheet) { show_404(); }
@@ -83,9 +81,11 @@ class Gs_lead_sync extends AdminController
         $sheet['column_mapping']      = json_decode($sheet['column_mapping']      ?? '{}', true) ?: [];
         $sheet['description_columns'] = json_decode($sheet['description_columns'] ?? '[]', true) ?: [];
 
+        $q = $this->db->get(db_prefix() . 'leads_status');
+        $data['lead_statuses'] = $q ? $q->result_array() : [];
+        $q = $this->db->get(db_prefix() . 'leads_sources');
+        $data['lead_sources']  = $q ? $q->result_array() : [];
         $data['sheet']         = $sheet;
-        $data['lead_statuses'] = $this->db->get(db_prefix() . 'leads_status')->result_array();
-        $data['lead_sources']  = $this->db->get(db_prefix() . 'leads_sources')->result_array();
         $data['crm_fields']    = LeadMapper::$crm_fields;
         $data['title']         = 'Edit Sheet Configuration';
 
@@ -151,6 +151,7 @@ class Gs_lead_sync extends AdminController
     {
         if (!is_admin()) { show_404(); }
         header('Content-Type: application/json');
+        require_once GS_LEAD_SYNC_DIR . 'libraries/GoogleSheetsClient.php';
 
         $spreadsheet_id = trim($this->input->post('spreadsheet_id'));
         $tab_name       = trim($this->input->post('sheet_tab')) ?: 'Sheet1';
@@ -179,6 +180,9 @@ class Gs_lead_sync extends AdminController
     {
         if (!is_admin()) { show_404(); }
         header('Content-Type: application/json');
+        require_once GS_LEAD_SYNC_DIR . 'libraries/LeadMapper.php';
+        require_once GS_LEAD_SYNC_DIR . 'libraries/GoogleSheetsClient.php';
+        require_once GS_LEAD_SYNC_DIR . 'libraries/SyncEngine.php';
 
         $engine = new SyncEngine();
         $stats  = $engine->sync_sheet((int)$id, 'manual');
