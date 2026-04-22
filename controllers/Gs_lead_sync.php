@@ -167,7 +167,7 @@ class Gs_lead_sync extends AdminController
         $service_account_json = get_option('gs_lead_sync_service_account_json');
         if (empty($service_account_json)) {
             echo json_encode(['success' => false, 'message' => 'Service Account JSON is not configured in Global Settings.']);
-            return;
+            die;
         }
 
         try {
@@ -177,6 +177,7 @@ class Gs_lead_sync extends AdminController
         } catch (Exception $e) {
             echo json_encode(['success' => false, 'message' => $e->getMessage()]);
         }
+        die;
     }
 
     // AJAX: POST admin/gs_lead_sync/sync_now/{id}
@@ -188,14 +189,19 @@ class Gs_lead_sync extends AdminController
         require_once GS_LEAD_SYNC_DIR . 'libraries/GoogleSheetsClient.php';
         require_once GS_LEAD_SYNC_DIR . 'libraries/SyncEngine.php';
 
-        $engine = new SyncEngine();
-        $stats  = $engine->sync_sheet((int)$id, 'manual');
+        try {
+            $engine = new SyncEngine();
+            $stats  = $engine->sync_sheet((int)$id, 'manual');
 
-        if (isset($stats['error'])) {
-            echo json_encode(['success' => false, 'message' => $stats['error'], 'stats' => $stats]);
-        } else {
-            echo json_encode(['success' => true, 'stats' => $stats]);
+            if (isset($stats['error'])) {
+                echo json_encode(['success' => false, 'message' => $stats['error'], 'stats' => $stats]);
+            } else {
+                echo json_encode(['success' => true, 'stats' => $stats]);
+            }
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
         }
+        die;
     }
 
     public function sync_log()

@@ -97,13 +97,11 @@
             </div>
 
             <div class="form-group">
-              <div class="checkbox">
-                <label>
-                  <input type="checkbox" name="is_active" value="1"
-                    <?php echo $s_is_active ? 'checked' : ''; ?>>
-                  Active (include in sync runs)
-                </label>
-              </div>
+              <label style="font-weight:normal;cursor:pointer;display:flex;align-items:center;gap:8px;">
+                <input type="checkbox" name="is_active" value="1" style="width:16px;height:16px;flex-shrink:0;cursor:pointer;"
+                  <?php echo $s_is_active ? 'checked' : ''; ?>>
+                Active (include in sync runs)
+              </label>
             </div>
 
           </div>
