@@ -4,12 +4,15 @@ defined('BASEPATH') or exit('No direct script access allowed');
 /**
  * Lightweight Google Sheets API v4 client using a Service Account.
  * No Composer or vendor dependencies — uses PHP's built-in openssl and cURL.
+ *
+ * Token cache is static so that multiple sheet syncs in a single request
+ * share one OAuth round-trip (keyed by service-account client_email).
  */
-class GoogleSheetsClient
+class Gs_GoogleSheetsClient
 {
     private $credentials;
-    private $access_token;
-    private $token_expires = 0;
+
+    private static $token_cache = []; // [client_email => ['token' => ..., 'expires' => ts]]
 
     public function __construct($service_account_json)
     {
@@ -22,20 +25,14 @@ class GoogleSheetsClient
         }
     }
 
-    /**
-     * Returns the header row (first row) of the sheet.
-     */
     public function get_headers($spreadsheet_id, $tab_name = 'Sheet1')
     {
-        $range = rawurlencode($tab_name . '!1:1');
-        $data  = $this->_api_get($spreadsheet_id, $range);
+        $range  = rawurlencode($tab_name . '!1:1');
+        $data   = $this->_api_get($spreadsheet_id, $range);
         $values = $data['values'] ?? [];
         return $values[0] ?? [];
     }
 
-    /**
-     * Returns all rows. Index 0 is the header row, the rest are data rows.
-     */
     public function get_rows($spreadsheet_id, $tab_name = 'Sheet1')
     {
         $range = rawurlencode($tab_name);
@@ -51,19 +48,16 @@ class GoogleSheetsClient
         $url   = 'https://sheets.googleapis.com/v4/spreadsheets/' . $spreadsheet_id . '/values/' . $encoded_range;
 
         $ch = curl_init($url);
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_HTTPHEADER     => ['Authorization: Bearer ' . $token],
-            CURLOPT_TIMEOUT        => 30,
-            CURLOPT_SSL_VERIFYPEER => true,
+        curl_setopt_array($ch, $this->_curl_defaults() + [
+            CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . $token],
         ]);
-        $response = curl_exec($ch);
-        $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $response   = curl_exec($ch);
+        $http_code  = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $curl_error = curl_error($ch);
         curl_close($ch);
 
-        if ($curl_error) {
-            throw new Exception('cURL error: ' . $curl_error);
+        if ($response === false || $curl_error) {
+            throw new Exception($this->_friendly_curl_error($curl_error));
         }
 
         $body = json_decode($response, true);
@@ -78,14 +72,18 @@ class GoogleSheetsClient
 
     private function _get_access_token()
     {
-        // Reuse token if still valid (with 60s buffer)
-        if ($this->access_token && time() < $this->token_expires - 60) {
-            return $this->access_token;
+        $email = $this->credentials['client_email'];
+        $now   = time();
+
+        if (isset(self::$token_cache[$email])) {
+            $cached = self::$token_cache[$email];
+            if ($now < $cached['expires'] - 60) {
+                return $cached['token'];
+            }
         }
 
-        $now = time();
         $payload = [
-            'iss'   => $this->credentials['client_email'],
+            'iss'   => $email,
             'scope' => 'https://www.googleapis.com/auth/spreadsheets.readonly',
             'aud'   => 'https://oauth2.googleapis.com/token',
             'iat'   => $now,
@@ -95,23 +93,20 @@ class GoogleSheetsClient
         $jwt = $this->_make_jwt($payload);
 
         $ch = curl_init('https://oauth2.googleapis.com/token');
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_POST           => true,
-            CURLOPT_POSTFIELDS     => http_build_query([
+        curl_setopt_array($ch, $this->_curl_defaults() + [
+            CURLOPT_POST       => true,
+            CURLOPT_POSTFIELDS => http_build_query([
                 'grant_type' => 'urn:ietf:params:oauth:grant-type:jwt-bearer',
                 'assertion'  => $jwt,
             ]),
-            CURLOPT_HTTPHEADER     => ['Content-Type: application/x-www-form-urlencoded'],
-            CURLOPT_TIMEOUT        => 30,
-            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_HTTPHEADER => ['Content-Type: application/x-www-form-urlencoded'],
         ]);
-        $response = curl_exec($ch);
+        $response   = curl_exec($ch);
         $curl_error = curl_error($ch);
         curl_close($ch);
 
-        if ($curl_error) {
-            throw new Exception('cURL error fetching token: ' . $curl_error);
+        if ($response === false || $curl_error) {
+            throw new Exception($this->_friendly_curl_error($curl_error));
         }
 
         $token_data = json_decode($response, true);
@@ -120,10 +115,42 @@ class GoogleSheetsClient
             throw new Exception('Failed to get Google access token: ' . $msg);
         }
 
-        $this->access_token  = $token_data['access_token'];
-        $this->token_expires = $now + ($token_data['expires_in'] ?? 3600);
+        self::$token_cache[$email] = [
+            'token'   => $token_data['access_token'],
+            'expires' => $now + ($token_data['expires_in'] ?? 3600),
+        ];
 
-        return $this->access_token;
+        return $token_data['access_token'];
+    }
+
+    private function _curl_defaults()
+    {
+        $defaults = [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => 30,
+            CURLOPT_CONNECTTIMEOUT => 10,
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_SSL_VERIFYHOST => 2,
+        ];
+        // If PHP has a CA bundle configured, pass it explicitly so cURL on
+        // Windows/XAMPP (which often has no default) verifies correctly.
+        $cainfo = ini_get('curl.cainfo') ?: ini_get('openssl.cafile');
+        if ($cainfo && is_file($cainfo)) {
+            $defaults[CURLOPT_CAINFO] = $cainfo;
+        }
+        return $defaults;
+    }
+
+    private function _friendly_curl_error($curl_error)
+    {
+        if (stripos($curl_error, 'SSL certificate') !== false
+            || stripos($curl_error, 'unable to get local issuer') !== false
+            || stripos($curl_error, 'CA') !== false) {
+            return 'cURL SSL error: ' . $curl_error
+                . ' — Your PHP install has no CA bundle. On Windows/XAMPP, download cacert.pem from https://curl.se/ca/cacert.pem '
+                . 'and set curl.cainfo in php.ini to its path. See README Troubleshooting.';
+        }
+        return 'cURL error: ' . $curl_error;
     }
 
     private function _make_jwt($payload)

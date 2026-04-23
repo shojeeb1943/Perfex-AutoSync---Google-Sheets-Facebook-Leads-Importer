@@ -1,11 +1,11 @@
-/* gs_lead_sync module styles */
+/* gs_lead_sync — scoped to the module's admin pages via URI-gated asset hook */
 
+/* Mapping table */
 #gs-mapping-table select.form-control {
     padding: 4px 8px;
     height: 30px;
     font-size: 12px;
 }
-
 #gs-mapping-table td {
     vertical-align: middle;
 }
@@ -25,6 +25,90 @@
     margin-top: 4px;
 }
 
-.label-success { background-color: #5cb85c; }
-.label-danger  { background-color: #d9534f; }
-.label-info    { background-color: #5bc0de; }
+/* Header info banner (settings page) */
+.gs-info-banner {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 10px 16px;
+    background: #f8f9fa;
+    border: 1px solid #e3e6ea;
+    border-radius: 6px;
+    font-size: 13px;
+    color: #555;
+    margin-bottom: 16px;
+}
+.gs-info-banner .gs-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+.gs-info-banner .gs-sep {
+    color: #ccc;
+}
+.gs-info-banner strong { color: #333; }
+.gs-info-banner .gs-status-warning { color: #e67e22; margin-left: auto; }
+.gs-info-banner .gs-status-ok      { color: #27ae60; margin-left: auto; }
+.gs-info-banner .fa-tag     { color: #4285f4; }
+.gs-info-banner .fa-info-circle { color: #34a853; }
+.gs-info-banner .fa-user-o  { color: #888; }
+.gs-info-banner .fa-clock-o { color: #888; }
+
+/* Service account card (global settings tab) */
+.gs-sa-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    background: #f0faf4;
+    border: 1px solid #b2dfdb;
+    border-radius: 6px;
+    margin-bottom: 10px;
+}
+.gs-sa-card .gs-sa-avatar {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: #fff;
+    border: 2px solid #34a853;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+.gs-sa-card .gs-sa-avatar .fa-google { color: #34a853; font-size: 18px; }
+.gs-sa-card .gs-sa-body  { flex: 1; min-width: 0; }
+.gs-sa-card .gs-sa-title {
+    font-weight: 600;
+    color: #1a7340;
+    font-size: 13px;
+    margin-bottom: 2px;
+}
+.gs-sa-card .gs-sa-title .fa-check-circle { color: #34a853; margin-right: 4px; }
+.gs-sa-card .gs-sa-email {
+    color: #333;
+    font-size: 13px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.gs-sa-card .gs-sa-email .fa-envelope-o { color: #888; margin-right: 4px; }
+.gs-sa-card .gs-sa-project { color: #666; font-size: 12px; margin-top: 2px; }
+.gs-sa-card .gs-sa-project .fa-folder-o { color: #aaa; margin-right: 4px; }
+.gs-sa-note { display: block; margin-bottom: 6px; }
+
+/* Inline checkbox label layout (active, cron_enabled, skip_test_leads) */
+.gs-checkbox-label {
+    font-weight: normal;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.gs-checkbox-label input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    cursor: pointer;
+}

@@ -9,11 +9,10 @@
     window.gsPopulateSelects = function (columns) {
         if (!columns || columns.length === 0) return;
 
-        // Populate each mapping dropdown
         $('.gs-col-select').each(function () {
-            var select    = $(this);
-            var savedVal  = select.val(); // preserve existing saved selection
-            var options   = '<option value="">— Skip —</option>';
+            var select   = $(this);
+            var savedVal = select.val();
+            var options  = '<option value="">— Skip —</option>';
             $.each(columns, function (i, col) {
                 options += '<option value="' + gsEsc(col) + '">' + gsEsc(col) + '</option>';
             });
@@ -23,7 +22,6 @@
             }
         });
 
-        // Populate Unique ID Column dropdown
         var idSelect   = $('#gs-id-column');
         var savedIdVal = idSelect.val();
         var idOptions  = '';
@@ -35,7 +33,6 @@
             idSelect.val(savedIdVal);
         }
 
-        // Rebuild description column checkboxes
         var descContainer = $('#gs-description-columns');
         var savedChecked  = [];
         descContainer.find('input[type=checkbox]:checked').each(function () {
@@ -52,7 +49,6 @@
             );
         });
 
-        // Show mapping section
         $('#gs-mapping-section').show();
     };
 
@@ -60,12 +56,23 @@
         return $('<div>').text(str).html();
     }
 
-    // Detect Columns button
+    // Shared session-expired handler. Called when the server responds with
+    // 403 or the body is HTML (CSRF mismatch returns the CI error page).
+    window.gsHandleSessionExpired = function (statusEl) {
+        var msg = 'Session expired — reloading in a moment…';
+        if (statusEl && statusEl.length) {
+            statusEl.removeClass('text-success').addClass('text-danger').text(msg);
+        } else {
+            alert(msg);
+        }
+        setTimeout(function () { location.reload(); }, 1500);
+    };
+
     $(document).on('click', '#gs-detect-columns', function () {
-        var btn            = $(this);
-        var spreadsheetId  = $('#gs-spreadsheet-id').val().trim();
-        var tabName        = $('#gs-sheet-tab').val().trim() || 'Sheet1';
-        var statusEl       = $('#gs-detect-status');
+        var btn           = $(this);
+        var spreadsheetId = $('#gs-spreadsheet-id').val().trim();
+        var tabName       = $('#gs-sheet-tab').val().trim() || 'Sheet1';
+        var statusEl      = $('#gs-detect-status');
 
         if (!spreadsheetId) {
             statusEl.removeClass('text-success text-danger').addClass('text-danger')
@@ -77,21 +84,39 @@
         statusEl.removeClass('text-success text-danger').text('');
 
         var payload = {spreadsheet_id: spreadsheetId, sheet_tab: tabName};
-        payload[GS_CSRF_NAME] = GS_CSRF_HASH;
+        if (typeof GS_CSRF_NAME !== 'undefined' && typeof GS_CSRF_HASH !== 'undefined') {
+            payload[GS_CSRF_NAME] = GS_CSRF_HASH;
+        }
 
-        $.post(GS_DETECT_URL, payload, function (resp) {
+        $.ajax({
+            url: GS_DETECT_URL,
+            method: 'POST',
+            data: payload,
+            dataType: 'json'
+        }).done(function (resp) {
+            if (resp && resp.csrf_hash) { GS_CSRF_HASH = resp.csrf_hash; }
             btn.prop('disabled', false).html('<i class="fa fa-search"></i> Detect Columns');
-            if (resp.success && resp.columns && resp.columns.length > 0) {
+            if (resp && resp.success && resp.columns && resp.columns.length > 0) {
                 window.gsPopulateSelects(resp.columns);
-                statusEl.addClass('text-success')
-                        .text('Detected ' + resp.columns.length + ' column(s).');
+                statusEl.removeClass('text-success text-danger').addClass('text-success')
+                        .text('Detected ' + resp.columns.length + ' column(s). Map them below, then save.');
             } else {
                 var msg = (resp && resp.message) ? resp.message : 'No columns found or API error.';
-                statusEl.addClass('text-danger').text(msg);
+                statusEl.removeClass('text-success text-danger').addClass('text-danger').text(msg);
             }
-        }, 'json').fail(function () {
+        }).fail(function (xhr) {
             btn.prop('disabled', false).html('<i class="fa fa-search"></i> Detect Columns');
-            statusEl.addClass('text-danger').text('Request failed. Check server error log.');
+            if (xhr.status === 403 || xhr.status === 419) {
+                window.gsHandleSessionExpired(statusEl);
+                return;
+            }
+            // CI 500 or HTML response — try to extract message, else advise log check.
+            var msg = 'Request failed (HTTP ' + xhr.status + '). Check server error log.';
+            try {
+                var parsed = JSON.parse(xhr.responseText);
+                if (parsed && parsed.message) { msg = parsed.message; }
+            } catch (e) { /* not JSON — keep generic */ }
+            statusEl.removeClass('text-success text-danger').addClass('text-danger').text(msg);
         });
     });
 

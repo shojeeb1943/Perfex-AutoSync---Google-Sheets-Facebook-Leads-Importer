@@ -9,35 +9,35 @@
       </div>
     </div>
 
-    <div class="row" style="margin-bottom:16px;">
+    <div class="row">
       <div class="col-md-12">
-        <div style="display:flex;align-items:center;flex-wrap:wrap;gap:10px;padding:10px 16px;background:#f8f9fa;border:1px solid #e3e6ea;border-radius:6px;font-size:13px;color:#555;">
-          <span style="display:flex;align-items:center;gap:5px;">
-            <i class="fa fa-tag" style="color:#4285f4;"></i>
-            <strong style="color:#333;">Version</strong>&nbsp;<span class="label label-info" style="font-size:12px;vertical-align:middle;">v<?php echo defined('GS_LEAD_SYNC_VERSION') ? GS_LEAD_SYNC_VERSION : '1.2.0'; ?></span>
+        <div class="gs-info-banner">
+          <span class="gs-item">
+            <i class="fa fa-tag"></i>
+            <strong>Version</strong>&nbsp;<span class="label label-info">v<?php echo GS_LEAD_SYNC_VERSION; ?></span>
           </span>
-          <span style="color:#ccc;">|</span>
-          <span style="display:flex;align-items:center;gap:5px;">
-            <i class="fa fa-info-circle" style="color:#34a853;"></i>
+          <span class="gs-sep">|</span>
+          <span class="gs-item">
+            <i class="fa fa-info-circle"></i>
             Auto-import Facebook Ads leads from Google Sheets into Perfex CRM
           </span>
-          <span style="color:#ccc;">|</span>
-          <span style="display:flex;align-items:center;gap:5px;">
-            <i class="fa fa-user-o" style="color:#888;"></i>
-            <strong style="color:#333;">Author:</strong>&nbsp;Bytesis
+          <span class="gs-sep">|</span>
+          <span class="gs-item">
+            <i class="fa fa-user-o"></i>
+            <strong>Author:</strong>&nbsp;Bytesis
           </span>
-          <span style="color:#ccc;">|</span>
-          <span style="display:flex;align-items:center;gap:5px;">
-            <i class="fa fa-perfex fa-clock-o" style="color:#888;"></i>
-            <strong style="color:#333;">Requires Perfex:</strong>&nbsp;2.3+
+          <span class="gs-sep">|</span>
+          <span class="gs-item">
+            <i class="fa fa-clock-o"></i>
+            <strong>Requires Perfex:</strong>&nbsp;2.3+
           </span>
-          <?php if (!defined('GS_LEAD_SYNC_SERVICE_ACCOUNT_SET') && empty($service_account_set)): ?>
-          <span style="margin-left:auto;display:flex;align-items:center;gap:5px;color:#e67e22;">
+          <?php if (empty($service_account_set)): ?>
+          <span class="gs-item gs-status-warning">
             <i class="fa fa-exclamation-triangle"></i>
             Setup not complete &mdash; configure your Google Service Account in <strong>Global Settings</strong>
           </span>
           <?php else: ?>
-          <span style="margin-left:auto;display:flex;align-items:center;gap:5px;color:#27ae60;">
+          <span class="gs-item gs-status-ok">
             <i class="fa fa-check-circle"></i>
             Google account connected &amp; ready
           </span>
@@ -100,11 +100,11 @@
                   }
                 ?>
                 <tr>
-                  <td><?php echo htmlspecialchars($sheet['name']); ?></td>
-                  <td><code><?php echo htmlspecialchars(substr($sheet['spreadsheet_id'], 0, 20)) . '...'; ?></code></td>
-                  <td><?php echo htmlspecialchars($sheet['sheet_tab']); ?></td>
-                  <td><?php echo htmlspecialchars($status_name); ?></td>
-                  <td><?php echo htmlspecialchars($source_name); ?></td>
+                  <td><?php echo htmlspecialchars($sheet['name'], ENT_QUOTES, 'UTF-8'); ?></td>
+                  <td><code><?php echo htmlspecialchars(substr($sheet['spreadsheet_id'], 0, 20), ENT_QUOTES, 'UTF-8') . '...'; ?></code></td>
+                  <td><?php echo htmlspecialchars($sheet['sheet_tab'], ENT_QUOTES, 'UTF-8'); ?></td>
+                  <td><?php echo htmlspecialchars($status_name, ENT_QUOTES, 'UTF-8'); ?></td>
+                  <td><?php echo htmlspecialchars($source_name, ENT_QUOTES, 'UTF-8'); ?></td>
                   <td>
                     <?php if ($sheet['is_active']): ?>
                       <span class="label label-success">Active</span>
@@ -114,19 +114,21 @@
                   </td>
                   <td>
                     <button class="btn btn-xs btn-primary gs-sync-now"
-                            data-id="<?php echo $sheet['id']; ?>"
-                            data-name="<?php echo htmlspecialchars($sheet['name']); ?>">
+                            data-id="<?php echo (int)$sheet['id']; ?>"
+                            data-name="<?php echo htmlspecialchars($sheet['name'], ENT_QUOTES, 'UTF-8'); ?>">
                       <i class="fa fa-refresh"></i> Sync Now
                     </button>
-                    <a href="<?php echo admin_url('gs_lead_sync/edit_sheet/' . $sheet['id']); ?>"
+                    <a href="<?php echo admin_url('gs_lead_sync/edit_sheet/' . (int)$sheet['id']); ?>"
                        class="btn btn-xs btn-default">
                       <i class="fa fa-pencil"></i> Edit
                     </a>
-                    <button class="btn btn-xs btn-danger gs-delete-sheet"
-                            data-id="<?php echo $sheet['id']; ?>"
-                            data-name="<?php echo htmlspecialchars($sheet['name']); ?>">
-                      <i class="fa fa-trash"></i> Delete
-                    </button>
+                    <form method="POST" action="<?php echo admin_url('gs_lead_sync/delete_sheet/' . (int)$sheet['id']); ?>" class="display-inline gs-delete-form" style="display:inline;">
+                      <?php echo form_hidden($this->security->get_csrf_token_name(), $this->security->get_csrf_hash()); ?>
+                      <button type="submit" class="btn btn-xs btn-danger gs-delete-sheet"
+                              data-name="<?php echo htmlspecialchars($sheet['name'], ENT_QUOTES, 'UTF-8'); ?>">
+                        <i class="fa fa-trash"></i> Delete
+                      </button>
+                    </form>
                   </td>
                 </tr>
                 <?php endforeach; ?>
@@ -148,27 +150,25 @@
             <div class="form-group">
               <label>Google Service Account JSON</label>
               <?php if ($service_account_set): ?>
-                <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:#f0faf4;border:1px solid #b2dfdb;border-radius:6px;margin-bottom:10px;">
-                  <div style="width:38px;height:38px;border-radius:50%;background:#fff;border:2px solid #34a853;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-                    <i class="fa fa-google" style="color:#34a853;font-size:18px;"></i>
-                  </div>
-                  <div style="flex:1;min-width:0;">
-                    <div style="font-weight:600;color:#1a7340;font-size:13px;margin-bottom:2px;">
-                      <i class="fa fa-check-circle" style="color:#34a853;margin-right:4px;"></i>Connected Google Service Account
+                <div class="gs-sa-card">
+                  <div class="gs-sa-avatar"><i class="fa fa-google"></i></div>
+                  <div class="gs-sa-body">
+                    <div class="gs-sa-title">
+                      <i class="fa fa-check-circle"></i>Connected Google Service Account
                     </div>
                     <?php if ($service_account_email): ?>
-                      <div style="color:#333;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
-                        <i class="fa fa-envelope-o" style="color:#888;margin-right:4px;"></i><?php echo htmlspecialchars($service_account_email); ?>
+                      <div class="gs-sa-email">
+                        <i class="fa fa-envelope-o"></i><?php echo htmlspecialchars($service_account_email, ENT_QUOTES, 'UTF-8'); ?>
                       </div>
                     <?php endif; ?>
                     <?php if ($service_account_project): ?>
-                      <div style="color:#666;font-size:12px;margin-top:2px;">
-                        <i class="fa fa-folder-o" style="color:#aaa;margin-right:4px;"></i>Project: <?php echo htmlspecialchars($service_account_project); ?>
+                      <div class="gs-sa-project">
+                        <i class="fa fa-folder-o"></i>Project: <?php echo htmlspecialchars($service_account_project, ENT_QUOTES, 'UTF-8'); ?>
                       </div>
                     <?php endif; ?>
                   </div>
                 </div>
-                <small class="text-muted" style="display:block;margin-bottom:6px;">Paste a new JSON below to replace the connected account.</small>
+                <small class="text-muted gs-sa-note">Paste a new JSON below to replace the connected account.</small>
               <?php else: ?>
                 <p class="text-warning"><i class="fa fa-warning"></i> Not configured yet. Paste your Google Service Account JSON key below.</p>
               <?php endif; ?>
@@ -192,15 +192,15 @@
             </div>
 
             <div class="form-group">
-              <label style="font-weight:normal;cursor:pointer;display:flex;align-items:center;gap:8px;">
-                <input type="checkbox" name="cron_enabled" value="1" style="width:16px;height:16px;flex-shrink:0;cursor:pointer;" <?php echo $cron_enabled == '1' ? 'checked' : ''; ?>>
+              <label class="gs-checkbox-label">
+                <input type="checkbox" name="cron_enabled" value="1" <?php echo $cron_enabled == '1' ? 'checked' : ''; ?>>
                 Enable automatic cron sync
               </label>
             </div>
 
             <div class="form-group">
-              <label style="font-weight:normal;cursor:pointer;display:flex;align-items:center;gap:8px;">
-                <input type="checkbox" name="skip_test_leads" value="1" style="width:16px;height:16px;flex-shrink:0;cursor:pointer;" <?php echo $skip_test_leads != '0' ? 'checked' : ''; ?>>
+              <label class="gs-checkbox-label">
+                <input type="checkbox" name="skip_test_leads" value="1" <?php echo $skip_test_leads != '0' ? 'checked' : ''; ?>>
                 Skip Facebook test leads (rows containing <code>&lt;test lead:</code> markers)
               </label>
             </div>
@@ -217,36 +217,72 @@
 </div>
 
 <script>
-// Sync Now
-$(document).on('click', '.gs-sync-now', function() {
+// CSRF token kept in a variable so it can be refreshed from AJAX responses
+// (guards against CSRF regeneration by background Perfex requests).
+var GS_CSRF_NAME = '<?php echo $this->security->get_csrf_token_name(); ?>';
+var GS_CSRF_HASH = '<?php echo $this->security->get_csrf_hash(); ?>';
+var GS_SYNC_URL  = '<?php echo admin_url("gs_lead_sync/sync_now/"); ?>';
+
+function gsCSRF() {
+    var d = {};
+    d[GS_CSRF_NAME] = GS_CSRF_HASH;
+    return d;
+}
+
+$(document).on('click', '.gs-sync-now', function () {
     var btn  = $(this);
     var id   = btn.data('id');
     var name = btn.data('name');
     btn.prop('disabled', true).html('<i class="fa fa-spin fa-spinner"></i> Syncing...');
-    $.post('<?php echo admin_url("gs_lead_sync/sync_now/"); ?>' + id, {
-        <?php echo $this->security->get_csrf_token_name(); ?>: '<?php echo $this->security->get_csrf_hash(); ?>'
-    }, function(resp) {
+
+    $.ajax({
+        url: GS_SYNC_URL + id,
+        method: 'POST',
+        data: gsCSRF(),
+        dataType: 'json'
+    }).done(function (resp) {
+        if (resp && resp.csrf_hash) { GS_CSRF_HASH = resp.csrf_hash; }
         btn.prop('disabled', false).html('<i class="fa fa-refresh"></i> Sync Now');
-        if (resp.success) {
+        if (resp && resp.success) {
             var s = resp.stats;
-            alert('Sync complete for "' + name + '":\nImported: ' + s.rows_imported + '\nSkipped: ' + s.rows_skipped + '\nFailed: ' + s.rows_failed);
+            var msg = 'Sync complete for "' + name + '":\n'
+                    + 'Imported: ' + s.rows_imported + '\n'
+                    + 'Skipped: '  + s.rows_skipped  + '\n'
+                    + 'Failed: '   + s.rows_failed;
+            if (s.error_details && s.error_details.length) {
+                msg += '\n\nErrors:\n' + s.error_details.slice(0, 5).join('\n');
+            }
+            alert(msg);
         } else {
-            alert('Sync failed: ' + (resp.message || 'Unknown error'));
+            alert('Sync failed: ' + ((resp && resp.message) || 'Unknown error'));
         }
-    }, 'json').fail(function() {
+    }).fail(function (xhr) {
         btn.prop('disabled', false).html('<i class="fa fa-refresh"></i> Sync Now');
-        alert('Request failed. Check server logs.');
+        if (xhr.status === 403 || xhr.status === 419) {
+            if (typeof window.gsHandleSessionExpired === 'function') {
+                window.gsHandleSessionExpired(null);
+            } else {
+                alert('Session expired — reloading.');
+                setTimeout(function () { location.reload(); }, 800);
+            }
+            return;
+        }
+        var msg = 'Request failed (HTTP ' + xhr.status + ').';
+        try {
+            var parsed = JSON.parse(xhr.responseText);
+            if (parsed && parsed.message) { msg = parsed.message; }
+        } catch (e) { /* keep generic */ }
+        alert(msg);
     });
 });
 
-// Delete sheet
-$(document).on('click', '.gs-delete-sheet', function() {
-    var id   = $(this).data('id');
-    var name = $(this).data('name');
-    if (!confirm('Delete sheet configuration "' + name + '"? This cannot be undone.')) return;
-    $.post('<?php echo admin_url("gs_lead_sync/delete_sheet/"); ?>' + id, {
-        <?php echo $this->security->get_csrf_token_name(); ?>: '<?php echo $this->security->get_csrf_hash(); ?>'
-    }, function() { location.reload(); });
+// Delete sheet — intercept the form submit for a confirm() prompt; the form
+// itself carries the CSRF token and POSTs to the controller.
+$(document).on('submit', '.gs-delete-form', function (e) {
+    var name = $(this).find('.gs-delete-sheet').data('name');
+    if (!confirm('Delete sheet configuration "' + name + '"? This cannot be undone.')) {
+        e.preventDefault();
+    }
 });
 </script>
 

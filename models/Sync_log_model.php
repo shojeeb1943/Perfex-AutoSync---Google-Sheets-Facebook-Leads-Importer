@@ -3,11 +3,6 @@ defined('BASEPATH') or exit('No direct script access allowed');
 
 class Sync_log_model extends App_Model
 {
-    public function __construct()
-    {
-        parent::__construct();
-    }
-
     public function is_imported($sheet_config_id, $row_lead_id)
     {
         return $this->db

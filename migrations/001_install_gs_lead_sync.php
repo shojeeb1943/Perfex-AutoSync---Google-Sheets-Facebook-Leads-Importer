@@ -18,11 +18,17 @@ function gs_lead_sync_install()
             'description_columns'=> ['type' => 'TEXT', 'null' => true],
             'id_column'          => ['type' => 'VARCHAR', 'constraint' => 100, 'default' => 'id'],
             'is_active'          => ['type' => 'TINYINT', 'constraint' => 1, 'default' => 1],
+            'last_run_at'        => ['type' => 'DATETIME', 'null' => true],
             'created_at'         => ['type' => 'DATETIME', 'null' => true],
             'updated_at'         => ['type' => 'DATETIME', 'null' => true],
         ]);
         $CI->dbforge->add_key('id', true);
         $CI->dbforge->create_table(db_prefix() . 'gs_lead_sync_sheets', true);
+    } elseif (!$CI->db->field_exists('last_run_at', db_prefix() . 'gs_lead_sync_sheets')) {
+        // Upgrade path for existing installations
+        $CI->dbforge->add_column(db_prefix() . 'gs_lead_sync_sheets', [
+            'last_run_at' => ['type' => 'DATETIME', 'null' => true, 'after' => 'is_active'],
+        ]);
     }
 
     if (!$CI->db->table_exists(db_prefix() . 'gs_lead_sync_imported')) {

@@ -165,7 +165,7 @@ The following CRM fields can be mapped to any sheet column:
 │                 FOR EACH DATA ROW                       │
 │                                                         │
 │  ✓ Check deduplication  →  skip if already imported     │
-│  ✓ LeadMapper::map_row()  →  transform to CRM schema    │
+│  ✓ Gs_LeadMapper::map_row() → transform to CRM schema   │
 │  ✓ Test lead check  →  skip if <test lead: marker       │
 │  ✓ Name validation  →  skip if no name field            │
 │  ✓ XSS sanitization  →  clean all string fields         │
@@ -392,10 +392,65 @@ All endpoints are under `/admin/gs_lead_sync/`.
   * * * * * php /path/to/perfex/index.php cron
   ```
 - Confirm **Enable Cron Sync** is toggled on in Global Settings
+- Perfex's cron fires every 5 minutes. The module now honors the
+  **Cron Sync Interval** setting — a sheet with interval=1hr will sync at
+  most once per hour even if cron ticks twelve times in that hour.
+
+### "Detect Columns" / "Sync Now" Fails Silently on Windows / XAMPP
+
+If Detect Columns shows `cURL SSL error: unable to get local issuer certificate`,
+your PHP install has no CA bundle configured.
+
+1. Download the latest CA bundle from <https://curl.se/ca/cacert.pem>.
+2. Save it somewhere stable, e.g. `C:\xampp\php\extras\ssl\cacert.pem`.
+3. Open `php.ini` and set:
+   ```ini
+   curl.cainfo   = "C:\xampp\php\extras\ssl\cacert.pem"
+   openssl.cafile = "C:\xampp\php\extras\ssl\cacert.pem"
+   ```
+4. Restart Apache.
+
+### "Session expired — reloading" on the UI
+
+Perfex regenerates the CSRF token on every request. If you had the settings
+page open for a while, the first Sync Now / Detect Columns click may 403.
+The UI now catches this and auto-reloads — wait for the reload, then retry.
+
+### Verifying Leads Were Created via the Real Perfex Pipeline
+
+After a successful sync, a newly imported lead should:
+- Have a non-empty `hash` column in `tblleads`
+- Appear in the staff activity feed as "Lead created"
+- Trigger the `lead_created` action hook (visible to other modules)
+- Have custom fields populated if mapped via Perfex's custom fields UI
+
+If any of these are missing, the module is not using `leads_model::add()` —
+upgrade to v1.3.0 or later.
 
 ---
 
 ## 📄 Changelog
+
+### v1.3.0
+- **Leads now use `leads_model::add()`** — triggers hooks, custom fields,
+  hash generation, email notifications, and activity log
+- Cron now respects the configured interval (no more API spam every 5 min)
+- `last_run_at` column added to sheet config for throttling
+- Library classes prefixed with `Gs_` to avoid collisions with other modules
+- Asset CSS/JS only injected on this module's admin pages (fixes global label
+  color bleed)
+- JSON AJAX responses hardened against stray PHP output
+- Destructive endpoints (`delete_sheet`, `sync_now`, `clear_logs`, `save_*`) are
+  POST-only
+- Graceful CSRF expiry handling — UI auto-reloads on 403
+- Windows/XAMPP cURL guidance when CA bundle is missing
+- Static access-token cache shared across sheets per request
+- Sparse Sheets rows padded to header length (fixes misaligned columns)
+- Column whitelist at insert boundary
+- Insert + mark_imported now run in a transaction
+- Uninstall hook wired (drops all 3 module tables)
+- Removed unused `google/apiclient` composer dep and unused language file
+- Fixed `fa-perfex` fake FontAwesome class, dead `defined()` check
 
 ### v1.2.0
 - Custom `GoogleSheetsClient` — removed external Composer dependency

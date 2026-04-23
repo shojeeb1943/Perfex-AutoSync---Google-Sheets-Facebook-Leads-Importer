@@ -3,11 +3,6 @@ defined('BASEPATH') or exit('No direct script access allowed');
 
 class Sheet_config_model extends App_Model
 {
-    public function __construct()
-    {
-        parent::__construct();
-    }
-
     public function get_all()
     {
         $q = $this->db->get(db_prefix() . 'gs_lead_sync_sheets');
@@ -44,8 +39,17 @@ class Sheet_config_model extends App_Model
     public function delete($id)
     {
         $this->db->where('id', $id)->delete(db_prefix() . 'gs_lead_sync_sheets');
-        // Also remove imported tracking rows for this sheet
         $this->db->where('sheet_config_id', $id)->delete(db_prefix() . 'gs_lead_sync_imported');
-        return $this->db->affected_rows() >= 0;
+    }
+
+    /**
+     * Record that a sync run has completed for this sheet.
+     * Used by the cron throttle to honor the configured interval.
+     */
+    public function mark_run($id)
+    {
+        $this->db->where('id', $id)->update(db_prefix() . 'gs_lead_sync_sheets', [
+            'last_run_at' => date('Y-m-d H:i:s'),
+        ]);
     }
 }

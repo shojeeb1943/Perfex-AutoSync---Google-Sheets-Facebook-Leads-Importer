@@ -1,13 +1,18 @@
 <?php
 defined('BASEPATH') or exit('No direct script access allowed');
 
-class SyncEngine
+class Gs_SyncEngine
 {
     private $CI;
 
     public function __construct()
     {
-        $this->CI = &get_instance();
+        $this->CI =& get_instance();
+        // Be defensive — works whether called from controller (which loads
+        // these in its constructor) or from cron / CLI.
+        $this->CI->load->model('gs_lead_sync/sheet_config_model');
+        $this->CI->load->model('gs_lead_sync/sync_log_model');
+        $this->CI->load->model('leads_model');
     }
 
     public function sync_all($triggered_by = 'cron')
@@ -15,7 +20,7 @@ class SyncEngine
         $sheets  = $this->CI->sheet_config_model->get_active_sheets();
         $results = [];
         foreach ($sheets as $sheet) {
-            $results[$sheet['id']] = $this->sync_sheet($sheet['id'], $triggered_by);
+            $results[$sheet['id']] = $this->sync_sheet((int)$sheet['id'], $triggered_by);
         }
         return $results;
     }
@@ -44,7 +49,7 @@ class SyncEngine
         }
 
         try {
-            $sheets_client = new GoogleSheetsClient($service_account_json);
+            $sheets_client = new Gs_GoogleSheetsClient($service_account_json);
             $all_rows      = $sheets_client->get_rows($config['spreadsheet_id'], $config['sheet_tab']);
         } catch (Exception $e) {
             $stats['error_details'][] = 'Fatal: ' . $e->getMessage();
@@ -66,56 +71,82 @@ class SyncEngine
         $id_column           = !empty($config['id_column']) ? $config['id_column'] : 'id';
         $skip_test_leads     = (get_option('gs_lead_sync_skip_test_leads') == '1');
 
-        $id_col_index = array_search($id_column, $header);
+        $id_col_index = array_search($id_column, $header, true);
+
+        // Without a working ID column we can't dedupe — refuse the run instead
+        // of silently re-importing every row on every cron tick.
+        if ($id_col_index === false) {
+            $msg = sprintf(
+                'Configured unique ID column "%s" not found in sheet header. Import aborted to prevent duplicate leads.',
+                $id_column
+            );
+            $stats['error_details'][] = 'Fatal: ' . $msg;
+            $this->_write_log($sheet_config_id, $triggered_by, $stats, $started_at);
+            return array_merge($stats, ['error' => $msg]);
+        }
+
+        // Column whitelist for insert — anything outside $crm_fields + system
+        // keys we set ourselves is discarded at the boundary.
+        $allowed = array_merge(
+            array_keys(Gs_LeadMapper::$crm_fields),
+            ['source', 'status', 'addedfrom', 'assigned']
+        );
+        $allowed = array_flip($allowed);
+
+        $addedfrom = function_exists('get_staff_user_id') ? (int)get_staff_user_id() : 0;
 
         foreach ($data_rows as $row_num => $row) {
-            $row_lead_id = '';
-            if ($id_col_index !== false && isset($row[$id_col_index])) {
-                $row_lead_id = trim($row[$id_col_index]);
+            $row_lead_id = isset($row[$id_col_index]) ? trim((string)$row[$id_col_index]) : '';
+
+            // Rows with no ID are un-dedupable — skip with a logged reason.
+            if ($row_lead_id === '') {
+                $stats['rows_skipped']++;
+                $stats['error_details'][] = 'Row ' . ($row_num + 2) . ': empty ID column value, skipped.';
+                continue;
             }
 
-            // Skip already-imported rows
-            if ($row_lead_id !== '' && $this->CI->sync_log_model->is_imported($sheet_config_id, $row_lead_id)) {
+            if ($this->CI->sync_log_model->is_imported($sheet_config_id, $row_lead_id)) {
                 $stats['rows_skipped']++;
                 continue;
             }
 
-            // Map row to lead data; returns null if test lead or missing name
-            $lead_data = LeadMapper::map_row($header, $row, $column_mapping, $description_columns, $skip_test_leads);
-
+            $lead_data = Gs_LeadMapper::map_row($header, $row, $column_mapping, $description_columns, $skip_test_leads);
             if ($lead_data === null) {
                 $stats['rows_skipped']++;
                 continue;
             }
 
-            // Set source and status from sheet config (not from the sheet column)
+            // Set source/status from the sheet config (not the sheet column).
             $lead_data['source']    = (int)$config['lead_source_id'];
             $lead_data['status']    = (int)$config['lead_status_id'];
-            $lead_data['dateadded'] = date('Y-m-d H:i:s');
-            $lead_data['addedfrom'] = 0;
+            $lead_data['addedfrom'] = $addedfrom;
 
-            // XSS-clean only string fields
-            foreach ($lead_data as $key => $val) {
-                if (is_string($val)) {
-                    $lead_data[$key] = $this->CI->security->xss_clean($val);
-                }
+            // Trim to known columns; prevents a rogue column_mapping entry
+            // from smuggling unexpected keys into the insert.
+            $lead_data = array_intersect_key($lead_data, $allowed);
+
+            $this->CI->db->trans_start();
+
+            // leads_model::add handles hash, custom fields, hooks, activity log.
+            $perfex_lead_id = $this->CI->leads_model->add($lead_data);
+
+            if ($perfex_lead_id) {
+                $this->CI->sync_log_model->mark_imported($sheet_config_id, $row_lead_id, (int)$perfex_lead_id);
             }
 
-            $inserted = $this->CI->db->insert(db_prefix() . 'leads', $lead_data);
+            $this->CI->db->trans_complete();
 
-            if ($inserted) {
-                $perfex_lead_id = $this->CI->db->insert_id();
-                if ($perfex_lead_id && $row_lead_id !== '') {
-                    $this->CI->sync_log_model->mark_imported($sheet_config_id, $row_lead_id, $perfex_lead_id);
-                }
-                $stats['rows_imported']++;
-            } else {
+            if ($this->CI->db->trans_status() === false || !$perfex_lead_id) {
                 $stats['rows_failed']++;
-                $stats['error_details'][] = 'Row ' . ($row_num + 2) . ': DB insert failed — ' . $this->CI->db->error()['message'];
+                $stats['error_details'][] = 'Row ' . ($row_num + 2) . ': leads_model::add() failed.';
+                continue;
             }
+
+            $stats['rows_imported']++;
         }
 
         $this->_write_log($sheet_config_id, $triggered_by, $stats, $started_at);
+        $this->CI->sheet_config_model->mark_run($sheet_config_id);
         return $stats;
     }
 

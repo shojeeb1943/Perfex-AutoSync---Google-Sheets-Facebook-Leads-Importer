@@ -1,9 +1,11 @@
 <?php
 defined('BASEPATH') or exit('No direct script access allowed');
 
-class LeadMapper
+class Gs_LeadMapper
 {
-    // Maps CRM field keys to human-readable labels shown in the mapping UI
+    // Maps CRM field keys to human-readable labels shown in the mapping UI.
+    // Values here are also used as the whitelist for columns handed to
+    // leads_model::add() — do not add keys that aren't real Perfex lead columns.
     public static $crm_fields = [
         'name'        => 'Name (required)',
         'email'       => 'Email Address',
@@ -22,22 +24,24 @@ class LeadMapper
     /**
      * Map a single sheet row to a Perfex CRM lead data array.
      *
-     * @param array  $header              The sheet header row
-     * @param array  $row_values          The data row values
-     * @param array  $column_mapping      JSON-decoded mapping: {crm_field => sheet_column_name}
-     * @param array  $description_columns Array of sheet column names to concat into description
-     * @param bool   $skip_test_leads     Whether to skip rows with <test lead: markers
-     * @return array|null Lead data array, or null if row should be skipped
+     * @param array $header              Sheet header row
+     * @param array $row_values          Data row (will be padded to header length)
+     * @param array $column_mapping      {crm_field => sheet_column_name}
+     * @param array $description_columns Sheet columns to concat into description
+     * @param bool  $skip_test_leads     Whether to skip Facebook test-lead rows
+     * @return array|null Lead data array, or null if the row should be skipped
      */
     public static function map_row($header, $row_values, $column_mapping, $description_columns = [], $skip_test_leads = true)
     {
-        // Build column index map: column_name => index
+        // Google Sheets API returns sparse arrays when trailing cells are
+        // empty. Pad so positional lookups by header index never miss.
+        $row_values = array_pad($row_values, count($header), '');
+
         $col_index = [];
         foreach ($header as $i => $col_name) {
             $col_index[trim($col_name)] = $i;
         }
 
-        // Helper: get value by column name
         $get_value = function ($col_name) use ($col_index, $row_values) {
             $col_name = trim($col_name);
             if (!isset($col_index[$col_name])) {
@@ -47,7 +51,6 @@ class LeadMapper
             return isset($row_values[$idx]) ? trim($row_values[$idx]) : '';
         };
 
-        // Test lead detection — check all values in the row
         if ($skip_test_leads) {
             foreach ($row_values as $cell) {
                 if (strpos((string)$cell, '<test lead:') !== false) {
@@ -56,29 +59,29 @@ class LeadMapper
             }
         }
 
-        // Map standard CRM fields from column_mapping
         $lead = [];
         foreach ($column_mapping as $crm_field => $sheet_col) {
             if (empty($sheet_col)) {
+                continue;
+            }
+            if (!isset(self::$crm_fields[$crm_field])) {
+                // Unknown CRM key — ignore rather than let it flow to insert.
                 continue;
             }
             $value = $get_value($sheet_col);
             if ($value === '') {
                 continue;
             }
-            // Phone cleanup: strip leading "p:" prefix Facebook adds
             if ($crm_field === 'phonenumber') {
                 $value = preg_replace('/^p:/i', '', $value);
             }
             $lead[$crm_field] = $value;
         }
 
-        // name is required
         if (empty($lead['name'])) {
             return null;
         }
 
-        // Build description from description_columns
         if (!empty($description_columns)) {
             $desc_parts = [];
             foreach ($description_columns as $col_name) {
