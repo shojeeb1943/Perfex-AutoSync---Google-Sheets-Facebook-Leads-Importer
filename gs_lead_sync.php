@@ -45,14 +45,18 @@ function gs_lead_sync_assets()
 function gs_lead_sync_menu()
 {
     $CI =& get_instance();
-    if (!is_admin() || !isset($CI->app_menu)) {
+    if (!is_admin()) {
+        return;
+    }
+    if (!isset($CI->app_menu) || !is_object($CI->app_menu)
+        || !method_exists($CI->app_menu, 'add_sidebar_menu_item')) {
         return;
     }
     $CI->app_menu->add_sidebar_menu_item('gs-lead-sync', [
         'name'     => 'GS Lead Sync',
         'href'     => admin_url('gs_lead_sync'),
         'icon'     => 'fa fa-table',
-        'position' => 15,
+        'position' => 35,
     ]);
 }
 

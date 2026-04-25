@@ -25,7 +25,7 @@
   ?>
 
   <form method="POST" action="<?php echo admin_url('gs_lead_sync/save_sheet'); ?>" id="sheet-config-form">
-    <?php echo form_hidden($this->security->get_csrf_token_name(), $this->security->get_csrf_hash()); ?>
+    <?php echo form_hidden($csrf_name, $csrf_hash); ?>
     <?php if (!empty($sheet['id'])): ?>
       <input type="hidden" name="id" value="<?php echo (int)$sheet['id']; ?>">
     <?php endif; ?>
@@ -225,8 +225,8 @@
 
 <script>
 var GS_DETECT_URL = '<?php echo admin_url("gs_lead_sync/detect_columns"); ?>';
-var GS_CSRF_NAME  = '<?php echo $this->security->get_csrf_token_name(); ?>';
-var GS_CSRF_HASH  = '<?php echo $this->security->get_csrf_hash(); ?>';
+var GS_CSRF_NAME  = '<?php echo $csrf_name; ?>';
+var GS_CSRF_HASH  = '<?php echo $csrf_hash; ?>';
 
 <?php if ($has_mapping): ?>
 // Pre-load saved columns for edit mode so dropdowns are fully populated

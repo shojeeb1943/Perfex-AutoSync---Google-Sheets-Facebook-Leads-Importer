@@ -30,6 +30,8 @@ class Gs_lead_sync extends AdminController
         $data['cron_enabled']            = get_option('gs_lead_sync_cron_enabled');
         $data['cron_interval']           = get_option('gs_lead_sync_cron_interval');
         $data['skip_test_leads']         = get_option('gs_lead_sync_skip_test_leads');
+        $data['csrf_name']               = $this->security->get_csrf_token_name();
+        $data['csrf_hash']               = $this->security->get_csrf_hash();
 
         $this->load->view('gs_lead_sync/settings/index', $data);
     }
@@ -67,6 +69,8 @@ class Gs_lead_sync extends AdminController
         $data['sheet']         = null;
         $data['crm_fields']    = Gs_LeadMapper::$crm_fields;
         $data['title']         = 'Add Sheet Configuration';
+        $data['csrf_name']     = $this->security->get_csrf_token_name();
+        $data['csrf_hash']     = $this->security->get_csrf_hash();
 
         $this->load->view('gs_lead_sync/settings/sheet_form', $data);
     }
@@ -86,6 +90,8 @@ class Gs_lead_sync extends AdminController
         $data['sheet']         = $sheet;
         $data['crm_fields']    = Gs_LeadMapper::$crm_fields;
         $data['title']         = 'Edit Sheet Configuration';
+        $data['csrf_name']     = $this->security->get_csrf_token_name();
+        $data['csrf_hash']     = $this->security->get_csrf_hash();
 
         $this->load->view('gs_lead_sync/settings/sheet_form', $data);
     }

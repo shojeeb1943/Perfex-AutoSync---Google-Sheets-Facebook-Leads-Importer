@@ -46,18 +46,24 @@
       </div>
     </div>
 
-  <ul class="nav nav-tabs" role="tablist">
-    <li role="presentation" class="active">
-      <a href="#tab-sheets" data-toggle="tab">Sheet Configurations</a>
-    </li>
-    <li role="presentation">
-      <a href="#tab-global" data-toggle="tab">Global Settings</a>
-    </li>
-    <li role="presentation">
-      <a href="<?php echo admin_url('gs_lead_sync/sync_log'); ?>">Sync Log</a>
-    </li>
-  </ul>
+  <div class="row">
+    <div class="col-md-12">
+      <ul class="nav nav-tabs" role="tablist">
+        <li role="presentation" class="active">
+          <a href="#tab-sheets" data-toggle="tab">Sheet Configurations</a>
+        </li>
+        <li role="presentation">
+          <a href="#tab-global" data-toggle="tab">Global Settings</a>
+        </li>
+        <li role="presentation">
+          <a href="<?php echo admin_url('gs_lead_sync/sync_log'); ?>">Sync Log</a>
+        </li>
+      </ul>
+    </div>
+  </div>
 
+  <div class="row">
+    <div class="col-md-12">
   <div class="tab-content mtop15">
 
     <!-- SHEET CONFIGS TAB -->
@@ -123,7 +129,7 @@
                       <i class="fa fa-pencil"></i> Edit
                     </a>
                     <form method="POST" action="<?php echo admin_url('gs_lead_sync/delete_sheet/' . (int)$sheet['id']); ?>" class="display-inline gs-delete-form" style="display:inline;">
-                      <?php echo form_hidden($this->security->get_csrf_token_name(), $this->security->get_csrf_hash()); ?>
+                      <?php echo form_hidden($csrf_name, $csrf_hash); ?>
                       <button type="submit" class="btn btn-xs btn-danger gs-delete-sheet"
                               data-name="<?php echo htmlspecialchars($sheet['name'], ENT_QUOTES, 'UTF-8'); ?>">
                         <i class="fa fa-trash"></i> Delete
@@ -143,7 +149,7 @@
     <!-- GLOBAL SETTINGS TAB -->
     <div role="tabpanel" class="tab-pane" id="tab-global">
       <form method="POST" action="<?php echo admin_url('gs_lead_sync/save_settings'); ?>">
-        <?php echo form_hidden($this->security->get_csrf_token_name(), $this->security->get_csrf_hash()); ?>
+        <?php echo form_hidden($csrf_name, $csrf_hash); ?>
         <div class="row">
           <div class="col-md-8">
 
@@ -218,6 +224,8 @@
     </div><!-- /tab-global -->
 
   </div><!-- /tab-content -->
+    </div><!-- /col -->
+  </div><!-- /row -->
 
   </div><!-- /content -->
 </div>
@@ -225,8 +233,8 @@
 <script>
 // CSRF token kept in a variable so it can be refreshed from AJAX responses
 // (guards against CSRF regeneration by background Perfex requests).
-var GS_CSRF_NAME = '<?php echo $this->security->get_csrf_token_name(); ?>';
-var GS_CSRF_HASH = '<?php echo $this->security->get_csrf_hash(); ?>';
+var GS_CSRF_NAME = '<?php echo $csrf_name; ?>';
+var GS_CSRF_HASH = '<?php echo $csrf_hash; ?>';
 var GS_SYNC_URL  = '<?php echo admin_url("gs_lead_sync/sync_now/"); ?>';
 var GS_TEST_URL  = '<?php echo admin_url("gs_lead_sync/test_connection"); ?>';
 
