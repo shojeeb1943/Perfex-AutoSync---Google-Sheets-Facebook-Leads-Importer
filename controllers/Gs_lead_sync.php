@@ -63,10 +63,7 @@ class Gs_lead_sync extends AdminController
         if (!is_admin()) { show_404(); }
         require_once GS_LEAD_SYNC_DIR . 'libraries/LeadMapper.php';
 
-        $q = $this->db->get(db_prefix() . 'leads_status');
-        $data['lead_statuses'] = $q ? $q->result_array() : [];
-        $q = $this->db->get(db_prefix() . 'leads_sources');
-        $data['lead_sources']  = $q ? $q->result_array() : [];
+        $data                  = $this->_load_lookup_data();
         $data['sheet']         = null;
         $data['crm_fields']    = Gs_LeadMapper::$crm_fields;
         $data['title']         = 'Add Sheet Configuration';
@@ -85,15 +82,29 @@ class Gs_lead_sync extends AdminController
         $sheet['column_mapping']      = json_decode($sheet['column_mapping']      ?? '{}', true) ?: [];
         $sheet['description_columns'] = json_decode($sheet['description_columns'] ?? '[]', true) ?: [];
 
-        $q = $this->db->get(db_prefix() . 'leads_status');
-        $data['lead_statuses'] = $q ? $q->result_array() : [];
-        $q = $this->db->get(db_prefix() . 'leads_sources');
-        $data['lead_sources']  = $q ? $q->result_array() : [];
+        $data                  = $this->_load_lookup_data();
         $data['sheet']         = $sheet;
         $data['crm_fields']    = Gs_LeadMapper::$crm_fields;
         $data['title']         = 'Edit Sheet Configuration';
 
         $this->load->view('gs_lead_sync/settings/sheet_form', $data);
+    }
+
+    private function _load_lookup_data()
+    {
+        $q = $this->db->get(db_prefix() . 'leads_status');
+        $out['lead_statuses'] = $q ? $q->result_array() : [];
+
+        $q = $this->db->get(db_prefix() . 'leads_sources');
+        $out['lead_sources']  = $q ? $q->result_array() : [];
+
+        // Active staff for the Default Assignee dropdown.
+        $q = $this->db->where('active', 1)
+                      ->order_by('firstname', 'asc')
+                      ->get(db_prefix() . 'staff');
+        $out['staff_list']    = $q ? $q->result_array() : [];
+
+        return $out;
     }
 
     public function save_sheet()
@@ -113,8 +124,9 @@ class Gs_lead_sync extends AdminController
             $spreadsheet_id = $m[1];
         }
 
-        $lead_status_id = $this->input->post('lead_status_id');
-        $lead_source_id = $this->input->post('lead_source_id');
+        $lead_status_id   = $this->input->post('lead_status_id');
+        $lead_source_id   = $this->input->post('lead_source_id');
+        $default_assignee = $this->input->post('default_assignee');
 
         $data = [
             'name'                => trim($this->input->post('name')),
@@ -122,6 +134,7 @@ class Gs_lead_sync extends AdminController
             'sheet_tab'           => trim($this->input->post('sheet_tab')) ?: 'Sheet1',
             'lead_status_id'      => ($lead_status_id === '' || $lead_status_id === null) ? null : (int)$lead_status_id,
             'lead_source_id'      => ($lead_source_id === '' || $lead_source_id === null) ? null : (int)$lead_source_id,
+            'default_assignee'    => ($default_assignee === '' || $default_assignee === null) ? null : (int)$default_assignee,
             'id_column'           => trim($this->input->post('id_column')) ?: 'id',
             'column_mapping'      => json_encode($column_mapping),
             'description_columns' => json_encode(array_values($description_columns)),
@@ -152,6 +165,53 @@ class Gs_lead_sync extends AdminController
         $this->sheet_config_model->delete((int)$id);
         set_alert('success', 'Sheet configuration deleted.');
         redirect(admin_url('gs_lead_sync'));
+    }
+
+    // AJAX: POST admin/gs_lead_sync/test_connection
+    // Verifies that the saved Service Account JSON can authenticate against
+    // Google's OAuth endpoint. Doesn't touch any spreadsheet.
+    public function test_connection()
+    {
+        $this->_require_post();
+        if (!is_admin()) { show_404(); }
+
+        require_once GS_LEAD_SYNC_DIR . 'libraries/GoogleSheetsClient.php';
+
+        // Allow testing freshly-pasted JSON before the user clicks Save, by
+        // accepting the payload from POST and falling back to the saved option.
+        $service_account_json = trim((string)$this->input->post('service_account_json'));
+        if ($service_account_json === '') {
+            $service_account_json = (string)get_option('gs_lead_sync_service_account_json');
+        }
+
+        if ($service_account_json === '') {
+            $this->_json([
+                'success'   => false,
+                'message'   => 'No Service Account JSON provided or saved. Paste your JSON in the textarea or save it first.',
+                'csrf_hash' => $this->security->get_csrf_hash(),
+            ]);
+            return;
+        }
+
+        try {
+            $client = new Gs_GoogleSheetsClient($service_account_json);
+            // get_token_for_test() walks the full JWT/OAuth round-trip so we
+            // catch every credential, network, or SSL failure mode.
+            $info = $client->get_token_for_test();
+
+            $this->_json([
+                'success'   => true,
+                'message'   => 'Google authentication succeeded. Service account is valid and reachable.',
+                'details'   => $info,
+                'csrf_hash' => $this->security->get_csrf_hash(),
+            ]);
+        } catch (Throwable $e) {
+            $this->_json([
+                'success'   => false,
+                'message'   => $e->getMessage(),
+                'csrf_hash' => $this->security->get_csrf_hash(),
+            ]);
+        }
     }
 
     // AJAX: POST admin/gs_lead_sync/detect_columns

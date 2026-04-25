@@ -17,6 +17,7 @@
   $s_id_col       = isset($sheet['id_column'])        ? $sheet['id_column']        : 'id';
   $s_status_id    = isset($sheet['lead_status_id'])   ? $sheet['lead_status_id']   : '';
   $s_source_id    = isset($sheet['lead_source_id'])   ? $sheet['lead_source_id']   : '';
+  $s_assignee     = isset($sheet['default_assignee']) ? $sheet['default_assignee'] : '';
   $s_is_active    = isset($sheet['is_active'])        ? $sheet['is_active']        : 1;
   $s_col_map      = isset($sheet['column_mapping'])   ? $sheet['column_mapping']   : [];
   $s_desc_cols    = isset($sheet['description_columns']) ? $sheet['description_columns'] : [];
@@ -97,8 +98,25 @@
             </div>
 
             <div class="form-group">
-              <label style="font-weight:normal;cursor:pointer;display:flex;align-items:center;gap:8px;">
-                <input type="checkbox" name="is_active" value="1" style="width:16px;height:16px;flex-shrink:0;cursor:pointer;"
+              <label>Default Assignee <small class="text-muted">(staff member who owns imported leads)</small></label>
+              <select name="default_assignee" class="form-control">
+                <option value="">— Unassigned —</option>
+                <?php foreach (($staff_list ?? []) as $st):
+                    $st_name = trim(($st['firstname'] ?? '') . ' ' . ($st['lastname'] ?? ''));
+                    if ($st_name === '') { $st_name = $st['email'] ?? ('Staff #' . $st['staffid']); }
+                ?>
+                <option value="<?php echo (int)$st['staffid']; ?>"
+                  <?php echo ($s_assignee !== '' && (int)$s_assignee === (int)$st['staffid']) ? 'selected' : ''; ?>>
+                  <?php echo htmlspecialchars($st_name, ENT_QUOTES, 'UTF-8'); ?>
+                </option>
+                <?php endforeach; ?>
+              </select>
+              <small class="text-muted">Without an assignee, leads may be invisible to non-admin staff depending on permissions.</small>
+            </div>
+
+            <div class="form-group">
+              <label class="gs-checkbox-label">
+                <input type="checkbox" name="is_active" value="1"
                   <?php echo $s_is_active ? 'checked' : ''; ?>>
                 Active (include in sync runs)
               </label>

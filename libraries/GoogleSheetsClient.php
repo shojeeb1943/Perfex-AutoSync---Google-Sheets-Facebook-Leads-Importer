@@ -40,6 +40,26 @@ class Gs_GoogleSheetsClient
         return $data['values'] ?? [];
     }
 
+    /**
+     * Force a full OAuth round-trip and return identifying info about the
+     * service account. Intended for the "Test Connection" UI button: any
+     * credential / network / SSL failure surfaces as an Exception with a
+     * specific message.
+     *
+     * @return array{client_email:string, project_id:?string, expires_in:int}
+     */
+    public function get_token_for_test()
+    {
+        // Force a fresh token (don't use cached one) to actually exercise OAuth.
+        unset(self::$token_cache[$this->credentials['client_email']]);
+        $this->_get_access_token();
+        return [
+            'client_email' => $this->credentials['client_email'],
+            'project_id'   => $this->credentials['project_id'] ?? null,
+            'expires_in'   => self::$token_cache[$this->credentials['client_email']]['expires'] - time(),
+        ];
+    }
+
     // -------------------------------------------------------------------------
 
     private function _api_get($spreadsheet_id, $encoded_range)

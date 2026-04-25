@@ -51,7 +51,7 @@ class Gs_SyncEngine
         try {
             $sheets_client = new Gs_GoogleSheetsClient($service_account_json);
             $all_rows      = $sheets_client->get_rows($config['spreadsheet_id'], $config['sheet_tab']);
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
             $stats['error_details'][] = 'Fatal: ' . $e->getMessage();
             $this->_write_log($sheet_config_id, $triggered_by, $stats, $started_at);
             return array_merge($stats, ['error' => $e->getMessage()]);
@@ -94,6 +94,7 @@ class Gs_SyncEngine
         $allowed = array_flip($allowed);
 
         $addedfrom = function_exists('get_staff_user_id') ? (int)get_staff_user_id() : 0;
+        $assignee  = !empty($config['default_assignee']) ? (int)$config['default_assignee'] : 0;
 
         foreach ($data_rows as $row_num => $row) {
             $row_lead_id = isset($row[$id_col_index]) ? trim((string)$row[$id_col_index]) : '';
@@ -116,10 +117,13 @@ class Gs_SyncEngine
                 continue;
             }
 
-            // Set source/status from the sheet config (not the sheet column).
+            // Set source/status/assignee from the sheet config (not the sheet column).
             $lead_data['source']    = (int)$config['lead_source_id'];
             $lead_data['status']    = (int)$config['lead_status_id'];
             $lead_data['addedfrom'] = $addedfrom;
+            if ($assignee > 0) {
+                $lead_data['assigned'] = $assignee;
+            }
 
             // Trim to known columns; prevents a rogue column_mapping entry
             // from smuggling unexpected keys into the insert.

@@ -10,17 +10,18 @@ Author: ByteSIS
 Author URI: https://bytesis.com
 */
 
-define('GS_LEAD_SYNC_MODULE_NAME', 'gs_lead_sync');
-define('GS_LEAD_SYNC_VERSION',     '1.3.0');
-define('GS_LEAD_SYNC_DIR',         dirname(__FILE__) . '/');
-define('GS_LEAD_SYNC_URI',         base_url('modules/gs_lead_sync/'));
+defined('GS_LEAD_SYNC_MODULE_NAME') or define('GS_LEAD_SYNC_MODULE_NAME', 'gs_lead_sync');
+defined('GS_LEAD_SYNC_VERSION')     or define('GS_LEAD_SYNC_VERSION',     '1.3.0');
+defined('GS_LEAD_SYNC_DIR')         or define('GS_LEAD_SYNC_DIR',         dirname(__FILE__) . '/');
+defined('GS_LEAD_SYNC_URI')         or define('GS_LEAD_SYNC_URI',         base_url('modules/gs_lead_sync/'));
 
-register_activation_hook(GS_LEAD_SYNC_MODULE_NAME, 'gs_lead_sync_activation_hook');
-register_uninstall_hook(GS_LEAD_SYNC_MODULE_NAME,  'gs_lead_sync_uninstall_hook');
-
-hooks()->add_action('app_admin_head', 'gs_lead_sync_assets');
-hooks()->add_action('app_cron',       'gs_lead_sync_cron');
-hooks()->add_action('admin_init',     'gs_lead_sync_menu');
+if (!function_exists('gs_lead_sync_activation_hook')) {
+    register_activation_hook(GS_LEAD_SYNC_MODULE_NAME, 'gs_lead_sync_activation_hook');
+    register_uninstall_hook(GS_LEAD_SYNC_MODULE_NAME,  'gs_lead_sync_uninstall_hook');
+    hooks()->add_action('app_admin_head', 'gs_lead_sync_assets');
+    hooks()->add_action('app_cron',       'gs_lead_sync_cron');
+    hooks()->add_action('admin_init',     'gs_lead_sync_menu');
+}
 
 /**
  * Inject CSS/JS only on this module's admin pages.
@@ -30,7 +31,11 @@ hooks()->add_action('admin_init',     'gs_lead_sync_menu');
 function gs_lead_sync_assets()
 {
     $CI =& get_instance();
-    if ($CI->uri->segment(1) !== 'gs_lead_sync') {
+    // Perfex admin URLs are /admin/gs_lead_sync/... — segment(1)='admin',
+    // segment(2)='gs_lead_sync'. Match on segment(2) (or anywhere in the URI
+    // for safety against routing customisations).
+    $uri = $CI->uri->uri_string();
+    if (strpos($uri, 'gs_lead_sync') === false) {
         return;
     }
     echo '<link rel="stylesheet" href="' . GS_LEAD_SYNC_URI . 'assets/css/gs_lead_sync.css">' . "\n";

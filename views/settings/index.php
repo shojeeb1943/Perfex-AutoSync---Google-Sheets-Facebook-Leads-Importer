@@ -172,9 +172,15 @@
               <?php else: ?>
                 <p class="text-warning"><i class="fa fa-warning"></i> Not configured yet. Paste your Google Service Account JSON key below.</p>
               <?php endif; ?>
-              <textarea name="service_account_json" class="form-control" rows="8"
+              <textarea name="service_account_json" id="gs-sa-json" class="form-control" rows="8"
                         placeholder='{"type":"service_account","project_id":"...","private_key":"...","client_email":"..."}'></textarea>
               <small class="text-muted">Leave blank to keep the existing key.</small>
+              <div class="mtop10">
+                <button type="button" id="gs-test-connection" class="btn btn-default btn-sm">
+                  <i class="fa fa-plug"></i> Test Google Connection
+                </button>
+                <span id="gs-test-status" class="mleft5"></span>
+              </div>
             </div>
 
             <div class="form-group">
@@ -222,6 +228,7 @@
 var GS_CSRF_NAME = '<?php echo $this->security->get_csrf_token_name(); ?>';
 var GS_CSRF_HASH = '<?php echo $this->security->get_csrf_hash(); ?>';
 var GS_SYNC_URL  = '<?php echo admin_url("gs_lead_sync/sync_now/"); ?>';
+var GS_TEST_URL  = '<?php echo admin_url("gs_lead_sync/test_connection"); ?>';
 
 function gsCSRF() {
     var d = {};
@@ -283,6 +290,52 @@ $(document).on('submit', '.gs-delete-form', function (e) {
     if (!confirm('Delete sheet configuration "' + name + '"? This cannot be undone.')) {
         e.preventDefault();
     }
+});
+
+// Test Google Connection — exercises the OAuth round-trip server-side.
+$(document).on('click', '#gs-test-connection', function () {
+    var btn      = $(this);
+    var statusEl = $('#gs-test-status');
+    var jsonNow  = $('#gs-sa-json').val();
+
+    btn.prop('disabled', true).html('<i class="fa fa-spin fa-spinner"></i> Testing...');
+    statusEl.removeClass('text-success text-danger').text('');
+
+    var payload = gsCSRF();
+    if (jsonNow && jsonNow.length > 10) {
+        payload.service_account_json = jsonNow;
+    }
+
+    $.ajax({
+        url: GS_TEST_URL,
+        method: 'POST',
+        data: payload,
+        dataType: 'json'
+    }).done(function (resp) {
+        if (resp && resp.csrf_hash) { GS_CSRF_HASH = resp.csrf_hash; }
+        btn.prop('disabled', false).html('<i class="fa fa-plug"></i> Test Google Connection');
+        if (resp && resp.success) {
+            var text = resp.message;
+            if (resp.details && resp.details.client_email) {
+                text += ' (' + resp.details.client_email + ')';
+            }
+            statusEl.addClass('text-success').text(text);
+        } else {
+            statusEl.addClass('text-danger').text((resp && resp.message) || 'Test failed.');
+        }
+    }).fail(function (xhr) {
+        btn.prop('disabled', false).html('<i class="fa fa-plug"></i> Test Google Connection');
+        if (xhr.status === 403 || xhr.status === 419) {
+            window.gsHandleSessionExpired ? window.gsHandleSessionExpired(statusEl) : location.reload();
+            return;
+        }
+        var msg = 'Request failed (HTTP ' + xhr.status + ').';
+        try {
+            var parsed = JSON.parse(xhr.responseText);
+            if (parsed && parsed.message) { msg = parsed.message; }
+        } catch (e) { /* keep generic */ }
+        statusEl.addClass('text-danger').text(msg);
+    });
 });
 </script>
 
