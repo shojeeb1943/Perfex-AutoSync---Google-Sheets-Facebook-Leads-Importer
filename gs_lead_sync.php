@@ -20,6 +20,7 @@ register_uninstall_hook(GS_LEAD_SYNC_MODULE_NAME,  'gs_lead_sync_uninstall_hook'
 hooks()->add_action('app_admin_head', 'gs_lead_sync_assets');
 hooks()->add_action('app_cron',       'gs_lead_sync_cron');
 hooks()->add_action('admin_init',     'gs_lead_sync_menu');
+hooks()->add_action('admin_init',     'gs_lead_sync_ensure_schema');
 
 function gs_lead_sync_assets()
 {
@@ -87,6 +88,24 @@ function gs_lead_sync_interval_seconds($key)
         case '6hr':   return 21600;
         case 'daily': return 86400;
         default:      return 3600;
+    }
+}
+
+function gs_lead_sync_ensure_schema()
+{
+    static $ran = false;
+    if ($ran) { return; }
+    $ran = true;
+
+    $CI =& get_instance();
+    if (!$CI->db->table_exists(db_prefix() . 'gs_lead_sync_sheets')) {
+        return;
+    }
+    $missing = !$CI->db->field_exists('default_assignee', db_prefix() . 'gs_lead_sync_sheets')
+            || !$CI->db->field_exists('last_run_at',       db_prefix() . 'gs_lead_sync_sheets');
+    if ($missing) {
+        require_once GS_LEAD_SYNC_DIR . 'migrations/001_install_gs_lead_sync.php';
+        gs_lead_sync_install();
     }
 }
 

@@ -120,29 +120,29 @@ class Gs_lead_sync extends AdminController
         $id = (int)$this->input->post('id');
 
         $column_mapping = $this->input->post('column_mapping') ?: [];
-        $column_mapping = array_filter($column_mapping, function ($v) { return $v !== ''; });
+        $column_mapping = is_array($column_mapping)
+            ? array_filter($column_mapping, function ($v) { return trim((string)$v) !== ''; })
+            : [];
 
-        $description_columns = $this->input->post('description_columns') ?: [];
-
-        $spreadsheet_id = trim($this->input->post('spreadsheet_id'));
+        $spreadsheet_id = trim((string)$this->input->post('spreadsheet_id'));
         if (preg_match('/\/spreadsheets\/d\/([a-zA-Z0-9_\-]+)/', $spreadsheet_id, $m)) {
             $spreadsheet_id = $m[1];
         }
 
-        $lead_status_id   = $this->input->post('lead_status_id');
-        $lead_source_id   = $this->input->post('lead_source_id');
-        $default_assignee = $this->input->post('default_assignee');
+        $lead_status_id   = (int)$this->input->post('lead_status_id');
+        $lead_source_id   = (int)$this->input->post('lead_source_id');
+        $default_assignee = (int)$this->input->post('default_assignee');
 
         $data = [
-            'name'                => trim($this->input->post('name')),
+            'name'                => trim((string)$this->input->post('name')),
             'spreadsheet_id'      => $spreadsheet_id,
-            'sheet_tab'           => trim($this->input->post('sheet_tab')) ?: 'Sheet1',
-            'lead_status_id'      => ($lead_status_id === '' || $lead_status_id === null) ? null : (int)$lead_status_id,
-            'lead_source_id'      => ($lead_source_id === '' || $lead_source_id === null) ? null : (int)$lead_source_id,
-            'default_assignee'    => ($default_assignee === '' || $default_assignee === null) ? null : (int)$default_assignee,
-            'id_column'           => trim($this->input->post('id_column')) ?: 'id',
-            'column_mapping'      => json_encode($column_mapping),
-            'description_columns' => json_encode(array_values($description_columns)),
+            'sheet_tab'           => trim((string)$this->input->post('sheet_tab')) ?: 'Sheet1',
+            'lead_status_id'      => $lead_status_id   > 0 ? $lead_status_id   : null,
+            'lead_source_id'      => $lead_source_id   > 0 ? $lead_source_id   : null,
+            'default_assignee'    => $default_assignee > 0 ? $default_assignee : null,
+            'id_column'           => trim((string)$this->input->post('id_column')) ?: 'id',
+            'column_mapping'      => json_encode((object)$column_mapping),
+            'description_columns' => '[]',
             'is_active'           => $this->input->post('is_active') ? 1 : 0,
         ];
 
@@ -200,47 +200,6 @@ class Gs_lead_sync extends AdminController
                 'success'   => true,
                 'message'   => 'Google authentication succeeded. Service account is valid and reachable.',
                 'details'   => $info,
-                'csrf_hash' => $this->security->get_csrf_hash(),
-            ]);
-        } catch (Throwable $e) {
-            $this->_json([
-                'success'   => false,
-                'message'   => $e->getMessage(),
-                'csrf_hash' => $this->security->get_csrf_hash(),
-            ]);
-        }
-    }
-
-    public function detect_columns()
-    {
-        $this->_require_post();
-        if (!is_admin()) { show_404(); }
-
-        require_once GS_LEAD_SYNC_DIR . 'libraries/GoogleSheetsClient.php';
-
-        $spreadsheet_id = trim($this->input->post('spreadsheet_id'));
-        $tab_name       = trim($this->input->post('sheet_tab')) ?: 'Sheet1';
-
-        if (preg_match('/\/spreadsheets\/d\/([a-zA-Z0-9_\-]+)/', $spreadsheet_id, $m)) {
-            $spreadsheet_id = $m[1];
-        }
-
-        $service_account_json = get_option('gs_lead_sync_service_account_json');
-        if (empty($service_account_json)) {
-            $this->_json([
-                'success'   => false,
-                'message'   => 'Service Account JSON is not configured in Global Settings.',
-                'csrf_hash' => $this->security->get_csrf_hash(),
-            ]);
-            return;
-        }
-
-        try {
-            $client  = new Gs_GoogleSheetsClient($service_account_json);
-            $headers = $client->get_headers($spreadsheet_id, $tab_name);
-            $this->_json([
-                'success'   => true,
-                'columns'   => $headers,
                 'csrf_hash' => $this->security->get_csrf_hash(),
             ]);
         } catch (Throwable $e) {
