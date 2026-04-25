@@ -4,24 +4,24 @@ defined('BASEPATH') or exit('No direct script access allowed');
 /*
 Module Name: Google Sheets Lead Sync
 Description: Auto-import Facebook Ads leads from Google Sheets into Perfex CRM
-Version: 1.3.0
+Version: 1.3.1
 Requires at least: 2.3.*
 Author: ByteSIS
 Author URI: https://bytesis.com
 */
 
 defined('GS_LEAD_SYNC_MODULE_NAME') or define('GS_LEAD_SYNC_MODULE_NAME', 'gs_lead_sync');
-defined('GS_LEAD_SYNC_VERSION')     or define('GS_LEAD_SYNC_VERSION',     '1.3.0');
+defined('GS_LEAD_SYNC_VERSION')     or define('GS_LEAD_SYNC_VERSION',     '1.3.1');
 defined('GS_LEAD_SYNC_DIR')         or define('GS_LEAD_SYNC_DIR',         dirname(__FILE__) . '/');
 defined('GS_LEAD_SYNC_URI')         or define('GS_LEAD_SYNC_URI',         base_url('modules/gs_lead_sync/'));
 
-if (!function_exists('gs_lead_sync_activation_hook')) {
-    register_activation_hook(GS_LEAD_SYNC_MODULE_NAME, 'gs_lead_sync_activation_hook');
-    register_uninstall_hook(GS_LEAD_SYNC_MODULE_NAME,  'gs_lead_sync_uninstall_hook');
-    hooks()->add_action('app_admin_head', 'gs_lead_sync_assets');
-    hooks()->add_action('app_cron',       'gs_lead_sync_cron');
-    hooks()->add_action('admin_init',     'gs_lead_sync_menu');
-}
+register_activation_hook(GS_LEAD_SYNC_MODULE_NAME, 'gs_lead_sync_activation_hook');
+register_uninstall_hook(GS_LEAD_SYNC_MODULE_NAME,  'gs_lead_sync_uninstall_hook');
+
+hooks()->add_action('app_admin_head', 'gs_lead_sync_assets');
+hooks()->add_action('app_cron',       'gs_lead_sync_cron');
+hooks()->add_action('admin_init',     'gs_lead_sync_menu');
+hooks()->add_action('admin_init',     'gs_lead_sync_ensure_schema');
 
 /**
  * Inject CSS/JS only on this module's admin pages.
@@ -45,14 +45,15 @@ function gs_lead_sync_assets()
 function gs_lead_sync_menu()
 {
     $CI =& get_instance();
-    if (is_admin()) {
-        $CI->app_menu->add_sidebar_menu_item('gs-lead-sync', [
-            'name'     => 'GS Lead Sync',
-            'href'     => admin_url('gs_lead_sync'),
-            'icon'     => 'fa fa-google',
-            'position' => 50,
-        ]);
+    if (!is_admin() || !isset($CI->app_menu)) {
+        return;
     }
+    $CI->app_menu->add_sidebar_menu_item('gs-lead-sync', [
+        'name'     => 'GS Lead Sync',
+        'href'     => admin_url('gs_lead_sync'),
+        'icon'     => 'fa fa-table',
+        'position' => 15,
+    ]);
 }
 
 /**
@@ -101,6 +102,30 @@ function gs_lead_sync_interval_seconds($key)
         case '6hr':   return 21600;
         case 'daily': return 86400;
         default:      return 3600;
+    }
+}
+
+/**
+ * Runs on every admin_init to ensure the DB columns are always up to date.
+ * This covers existing installations where the activation hook didn't re-run
+ * after a module update that added new columns (e.g. default_assignee).
+ */
+function gs_lead_sync_ensure_schema()
+{
+    $CI =& get_instance();
+    if (!$CI->db->table_exists(db_prefix() . 'gs_lead_sync_sheets')) {
+        return;
+    }
+    $CI->load->dbforge();
+    if (!$CI->db->field_exists('last_run_at', db_prefix() . 'gs_lead_sync_sheets')) {
+        $CI->dbforge->add_column(db_prefix() . 'gs_lead_sync_sheets', [
+            'last_run_at' => ['type' => 'DATETIME', 'null' => true],
+        ]);
+    }
+    if (!$CI->db->field_exists('default_assignee', db_prefix() . 'gs_lead_sync_sheets')) {
+        $CI->dbforge->add_column(db_prefix() . 'gs_lead_sync_sheets', [
+            'default_assignee' => ['type' => 'INT', 'constraint' => 11, 'null' => true],
+        ]);
     }
 }
 
