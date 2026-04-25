@@ -3,10 +3,7 @@ defined('BASEPATH') or exit('No direct script access allowed');
 
 class Gs_LeadMapper
 {
-    // Maps CRM field keys to human-readable labels shown in the mapping UI.
-    // Values here are also used as the whitelist for columns handed to
-    // leads_model::add() — do not add keys that aren't real Perfex lead columns.
-    public static $crm_fields = [
+    public static $crm_fields = array(
         'name'        => 'Name (required)',
         'email'       => 'Email Address',
         'phonenumber' => 'Phone Number',
@@ -20,34 +17,20 @@ class Gs_LeadMapper
         'website'     => 'Website',
         'lead_value'  => 'Lead Value',
         'description' => 'Description / Notes',
-    ];
+    );
 
-    /**
-     * Map a single sheet row to a Perfex CRM lead data array.
-     *
-     * @param array $header              Sheet header row
-     * @param array $row_values          Data row (will be padded to header length)
-     * @param array $column_mapping      {crm_field => sheet_column_name}
-     * @param array $description_columns Sheet columns to concat into description
-     * @param bool  $skip_test_leads     Whether to skip Facebook test-lead rows
-     * @return array|null Lead data array, or null if the row should be skipped
-     */
-    public static function map_row($header, $row_values, $column_mapping, $description_columns = [], $skip_test_leads = true)
+    public static function map_row($header, $row_values, $column_mapping, $description_columns = array(), $skip_test_leads = true)
     {
-        // Google Sheets API returns sparse arrays when trailing cells are
-        // empty. Pad so positional lookups by header index never miss.
         $row_values = array_pad($row_values, count($header), '');
 
-        $col_index = [];
+        $col_index = array();
         foreach ($header as $i => $col_name) {
             $col_index[trim($col_name)] = $i;
         }
 
         $get_value = function ($col_name) use ($col_index, $row_values) {
             $col_name = trim($col_name);
-            if (!isset($col_index[$col_name])) {
-                return '';
-            }
+            if (!isset($col_index[$col_name])) { return ''; }
             $idx = $col_index[$col_name];
             return isset($row_values[$idx]) ? trim($row_values[$idx]) : '';
         };
@@ -60,21 +43,16 @@ class Gs_LeadMapper
             }
         }
 
-        $lead = [];
+        $lead = array();
         foreach ($column_mapping as $crm_field => $sheet_col) {
-            if (empty($sheet_col)) {
-                continue;
-            }
-            if (!isset(self::$crm_fields[$crm_field])) {
-                // Unknown CRM key — ignore rather than let it flow to insert.
-                continue;
-            }
+            if (empty($sheet_col)) { continue; }
+            if (!isset(self::$crm_fields[$crm_field])) { continue; }
+
             $value = $get_value($sheet_col);
-            if ($value === '') {
-                continue;
-            }
-            // Strip tags to prevent XSS from external sheet data.
+            if ($value === '') { continue; }
+
             $value = strip_tags($value);
+
             if ($crm_field === 'phonenumber') {
                 $value = preg_replace('/^p:/i', '', $value);
             }
@@ -89,7 +67,7 @@ class Gs_LeadMapper
         }
 
         if (!empty($description_columns)) {
-            $desc_parts = [];
+            $desc_parts = array();
             foreach ($description_columns as $col_name) {
                 $value = strip_tags($get_value($col_name));
                 if ($value !== '') {
