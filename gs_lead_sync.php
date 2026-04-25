@@ -92,8 +92,12 @@ function gs_lead_sync_interval_seconds($key)
 
 function gs_lead_sync_activation_hook()
 {
-    require_once GS_LEAD_SYNC_DIR . 'migrations/001_install_gs_lead_sync.php';
-    gs_lead_sync_install();
+    try {
+        require_once GS_LEAD_SYNC_DIR . 'migrations/001_install_gs_lead_sync.php';
+        gs_lead_sync_install();
+    } catch (Throwable $e) {
+        log_message('error', 'gs_lead_sync activation: ' . $e->getMessage());
+    }
 
     if (get_option('gs_lead_sync_skip_test_leads') === '') {
         add_option('gs_lead_sync_skip_test_leads', '1');
