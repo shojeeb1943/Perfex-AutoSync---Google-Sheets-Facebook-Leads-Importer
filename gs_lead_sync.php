@@ -98,14 +98,28 @@ function gs_lead_sync_ensure_schema()
     $ran = true;
 
     $CI =& get_instance();
-    if (!$CI->db->table_exists(db_prefix() . 'gs_lead_sync_sheets')) {
+
+    // Suppress db_debug so SHOW TABLES/COLUMNS never trigger show_error() → exit().
+    $prev = $CI->db->db_debug;
+    $CI->db->db_debug = false;
+
+    $table_ok = $CI->db->table_exists(db_prefix() . 'gs_lead_sync_sheets');
+
+    $CI->db->db_debug = $prev;
+
+    if (!$table_ok) {
         return;
     }
-    $missing = !$CI->db->field_exists('default_assignee', db_prefix() . 'gs_lead_sync_sheets')
-            || !$CI->db->field_exists('last_run_at',       db_prefix() . 'gs_lead_sync_sheets');
-    if ($missing) {
+
+    $prev = $CI->db->db_debug;
+    $CI->db->db_debug = false;
+    $has_assignee   = $CI->db->field_exists('default_assignee', db_prefix() . 'gs_lead_sync_sheets');
+    $has_last_run   = $CI->db->field_exists('last_run_at',       db_prefix() . 'gs_lead_sync_sheets');
+    $CI->db->db_debug = $prev;
+
+    if (!$has_assignee || !$has_last_run) {
         require_once GS_LEAD_SYNC_DIR . 'migrations/001_install_gs_lead_sync.php';
-        gs_lead_sync_install();
+        gs_lead_sync_install(); // db_debug already suppressed internally
     }
 }
 
