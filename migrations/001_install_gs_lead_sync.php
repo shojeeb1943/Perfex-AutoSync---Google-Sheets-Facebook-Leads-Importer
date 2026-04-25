@@ -4,18 +4,21 @@ defined('BASEPATH') or exit('No direct script access allowed');
 /**
  * Wraps the install/uninstall helpers in a CI_Migration class so Perfex's
  * "Upgrade Database" scanner can load this file without a fatal error.
+ * Guard against CI_Migration not being loaded yet (e.g. during module scan).
  * The activation/uninstall hooks also call these helpers directly.
  */
-class Migration_Install_gs_lead_sync extends CI_Migration
-{
-    public function up()
+if (class_exists('CI_Migration')) {
+    class Migration_Install_gs_lead_sync extends CI_Migration
     {
-        gs_lead_sync_install();
-    }
+        public function up()
+        {
+            gs_lead_sync_install();
+        }
 
-    public function down()
-    {
-        gs_lead_sync_uninstall();
+        public function down()
+        {
+            gs_lead_sync_uninstall();
+        }
     }
 }
 

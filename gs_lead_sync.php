@@ -112,20 +112,24 @@ function gs_lead_sync_interval_seconds($key)
  */
 function gs_lead_sync_ensure_schema()
 {
-    $CI =& get_instance();
-    if (!$CI->db->table_exists(db_prefix() . 'gs_lead_sync_sheets')) {
-        return;
-    }
-    $CI->load->dbforge();
-    if (!$CI->db->field_exists('last_run_at', db_prefix() . 'gs_lead_sync_sheets')) {
-        $CI->dbforge->add_column(db_prefix() . 'gs_lead_sync_sheets', [
-            'last_run_at' => ['type' => 'DATETIME', 'null' => true],
-        ]);
-    }
-    if (!$CI->db->field_exists('default_assignee', db_prefix() . 'gs_lead_sync_sheets')) {
-        $CI->dbforge->add_column(db_prefix() . 'gs_lead_sync_sheets', [
-            'default_assignee' => ['type' => 'INT', 'constraint' => 11, 'null' => true],
-        ]);
+    try {
+        $CI =& get_instance();
+        if (!$CI->db->table_exists(db_prefix() . 'gs_lead_sync_sheets')) {
+            return;
+        }
+        $CI->load->dbforge();
+        if (!$CI->db->field_exists('last_run_at', db_prefix() . 'gs_lead_sync_sheets')) {
+            $CI->dbforge->add_column(db_prefix() . 'gs_lead_sync_sheets', [
+                'last_run_at' => ['type' => 'DATETIME', 'null' => true],
+            ]);
+        }
+        if (!$CI->db->field_exists('default_assignee', db_prefix() . 'gs_lead_sync_sheets')) {
+            $CI->dbforge->add_column(db_prefix() . 'gs_lead_sync_sheets', [
+                'default_assignee' => ['type' => 'INT', 'constraint' => 11, 'null' => true],
+            ]);
+        }
+    } catch (Throwable $e) {
+        log_message('error', 'gs_lead_sync_ensure_schema: ' . $e->getMessage());
     }
 }
 
