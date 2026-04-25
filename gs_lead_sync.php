@@ -143,13 +143,13 @@ function gs_lead_sync_activation_hook()
     gs_lead_sync_install();
 
     if (get_option('gs_lead_sync_skip_test_leads') === '') {
-        update_option('gs_lead_sync_skip_test_leads', '1');
+        add_option('gs_lead_sync_skip_test_leads', '1');
     }
     if (get_option('gs_lead_sync_cron_enabled') === '') {
-        update_option('gs_lead_sync_cron_enabled', '0');
+        add_option('gs_lead_sync_cron_enabled', '0');
     }
     if (get_option('gs_lead_sync_cron_interval') === '') {
-        update_option('gs_lead_sync_cron_interval', '1hr');
+        add_option('gs_lead_sync_cron_interval', '1hr');
     }
 }
 

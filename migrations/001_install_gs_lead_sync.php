@@ -8,6 +8,7 @@ defined('BASEPATH') or exit('No direct script access allowed');
  * The activation/uninstall hooks also call these helpers directly.
  */
 if (class_exists('CI_Migration')) {
+    if (!class_exists('Migration_Install_gs_lead_sync')) {
     class Migration_Install_gs_lead_sync extends CI_Migration
     {
         public function up()
@@ -20,6 +21,7 @@ if (class_exists('CI_Migration')) {
             gs_lead_sync_uninstall();
         }
     }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -27,6 +29,7 @@ if (class_exists('CI_Migration')) {
 // by the CI_Migration class above.
 // ---------------------------------------------------------------------------
 
+if (!function_exists('gs_lead_sync_install')) {
 function gs_lead_sync_install()
 {
     $CI = &get_instance();
@@ -95,7 +98,9 @@ function gs_lead_sync_install()
         $CI->dbforge->create_table(db_prefix() . 'gs_lead_sync_logs', true);
     }
 }
+}
 
+if (!function_exists('gs_lead_sync_uninstall')) {
 function gs_lead_sync_uninstall()
 {
     $CI = &get_instance();
@@ -103,4 +108,5 @@ function gs_lead_sync_uninstall()
     $CI->dbforge->drop_table(db_prefix() . 'gs_lead_sync_logs',    true);
     $CI->dbforge->drop_table(db_prefix() . 'gs_lead_sync_imported', true);
     $CI->dbforge->drop_table(db_prefix() . 'gs_lead_sync_sheets',   true);
+}
 }
