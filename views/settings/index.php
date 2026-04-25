@@ -128,7 +128,7 @@
                        class="btn btn-xs btn-default">
                       <i class="fa fa-pencil"></i> Edit
                     </a>
-                    <form method="POST" action="<?php echo admin_url('gs_lead_sync/delete_sheet/' . (int)$sheet['id']); ?>" class="display-inline gs-delete-form" style="display:inline;">
+                    <form method="POST" action="<?php echo admin_url('gs_lead_sync/delete_sheet/' . (int)$sheet['id']); ?>" class="display-inline gs-delete-form">
                       <?php echo form_hidden($csrf_name, $csrf_hash); ?>
                       <button type="submit" class="btn btn-xs btn-danger gs-delete-sheet"
                               data-name="<?php echo htmlspecialchars($sheet['name'], ENT_QUOTES, 'UTF-8'); ?>">

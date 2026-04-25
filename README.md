@@ -3,7 +3,7 @@
 # ⚡ Perfex AutoSync
 ### Google Sheets & Facebook Leads Importer
 
-[![Version](https://img.shields.io/badge/version-1.2.0-6C63FF?style=for-the-badge)](#)
+[![Version](https://img.shields.io/badge/version-1.3.2-6C63FF?style=for-the-badge)](#)
 [![Perfex CRM](https://img.shields.io/badge/Perfex%20CRM-Module-FF6584?style=for-the-badge)](#)
 [![PHP](https://img.shields.io/badge/PHP-7.0%2B-777BB4?style=for-the-badge&logo=php&logoColor=white)](#)
 [![License](https://img.shields.io/badge/license-Commercial-43D9AD?style=for-the-badge)](#)
@@ -131,14 +131,14 @@ The following CRM fields can be mapped to any sheet column:
 | `email` | Email Address |
 | `phonenumber` | Phone Number |
 | `company` | Company |
-| `position` | Position |
+| `title` | Title / Job Title |
 | `address` | Address |
 | `city` | City |
+| `state` | State |
 | `country` | Country |
 | `zip` | ZIP / Postal Code |
 | `website` | Website |
 | `lead_value` | Lead Value |
-| `note1` – `note5` | Custom Notes (5 fields) |
 
 > **Tip:** Use **Detect Columns** to auto-populate all mapping dropdowns from your live sheet. No manual column name entry needed.
 
@@ -290,7 +290,7 @@ finished_at       DATETIME
 |-------|----------------|
 | **Admin-Only Access** | All routes check `is_admin()` — non-admins are blocked |
 | **CSRF Protection** | All forms and AJAX POST requests include CodeIgniter CSRF tokens |
-| **XSS Prevention** | `xss_clean()` applied to all lead data before DB insert |
+| **XSS Prevention** | `strip_tags()` applied to all mapped sheet values before DB insert |
 | **SQL Injection** | CodeIgniter Query Builder with parameterized queries throughout |
 | **Service Account Validation** | JSON is validated for required fields (`private_key`, `client_email`) before saving |
 | **SSL/TLS Enforcement** | Google API calls use `CURLOPT_SSL_VERIFYPEER = true` |
@@ -430,6 +430,18 @@ upgrade to v1.3.0 or later.
 ---
 
 ## 📄 Changelog
+
+### v1.3.2
+- **Fixed HTTP 500 on module activation** — removed `base_url()` call at file-load
+  time that fataled during module scan/activation on some Perfex configurations
+- Added missing `state` field to column mapping
+- Added `strip_tags()` XSS sanitization to all mapped sheet values
+- Added 10-second rate limit on manual "Sync Now" to prevent accidental hammering
+- README field documentation corrected (`position` → `title`, removed non-existent
+  `note1`–`note5`)
+
+### v1.3.1
+- Production patch release
 
 ### v1.3.0
 - **Leads now use `leads_model::add()`** — triggers hooks, custom fields,

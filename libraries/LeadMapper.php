@@ -14,6 +14,7 @@ class Gs_LeadMapper
         'title'       => 'Title / Job Title',
         'address'     => 'Address',
         'city'        => 'City',
+        'state'       => 'State',
         'country'     => 'Country',
         'zip'         => 'Zip Code',
         'website'     => 'Website',
@@ -72,8 +73,13 @@ class Gs_LeadMapper
             if ($value === '') {
                 continue;
             }
+            // Strip tags to prevent XSS from external sheet data.
+            $value = strip_tags($value);
             if ($crm_field === 'phonenumber') {
                 $value = preg_replace('/^p:/i', '', $value);
+            }
+            if ($crm_field === 'lead_value') {
+                $value = preg_replace('/[^0-9.]/', '', $value);
             }
             $lead[$crm_field] = $value;
         }
@@ -85,7 +91,7 @@ class Gs_LeadMapper
         if (!empty($description_columns)) {
             $desc_parts = [];
             foreach ($description_columns as $col_name) {
-                $value = $get_value($col_name);
+                $value = strip_tags($get_value($col_name));
                 if ($value !== '') {
                     $desc_parts[] = $col_name . ': ' . $value;
                 }

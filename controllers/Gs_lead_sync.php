@@ -268,6 +268,19 @@ class Gs_lead_sync extends AdminController
         $this->_require_post();
         if (!is_admin()) { show_404(); }
 
+        // Basic rate limit: one manual sync per sheet per 10 seconds.
+        $rate_key = 'gs_lead_sync_last_manual_' . (int)$id;
+        $last_hit = $this->session->userdata($rate_key);
+        if ($last_hit && (time() - (int)$last_hit) < 10) {
+            $this->_json([
+                'success'   => false,
+                'message'   => 'Please wait a moment before syncing again.',
+                'csrf_hash' => $this->security->get_csrf_hash(),
+            ]);
+            return;
+        }
+        $this->session->set_userdata($rate_key, time());
+
         require_once GS_LEAD_SYNC_DIR . 'libraries/LeadMapper.php';
         require_once GS_LEAD_SYNC_DIR . 'libraries/GoogleSheetsClient.php';
         require_once GS_LEAD_SYNC_DIR . 'libraries/SyncEngine.php';

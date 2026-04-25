@@ -4,16 +4,15 @@ defined('BASEPATH') or exit('No direct script access allowed');
 /*
 Module Name: Google Sheets Lead Sync
 Description: Auto-import Facebook Ads leads from Google Sheets into Perfex CRM
-Version: 1.3.1
+Version: 1.3.2
 Requires at least: 2.3.*
 Author: ByteSIS
 Author URI: https://bytesis.com
 */
 
 defined('GS_LEAD_SYNC_MODULE_NAME') or define('GS_LEAD_SYNC_MODULE_NAME', 'gs_lead_sync');
-defined('GS_LEAD_SYNC_VERSION')     or define('GS_LEAD_SYNC_VERSION',     '1.3.1');
+defined('GS_LEAD_SYNC_VERSION')     or define('GS_LEAD_SYNC_VERSION',     '1.3.2');
 defined('GS_LEAD_SYNC_DIR')         or define('GS_LEAD_SYNC_DIR',         dirname(__FILE__) . '/');
-defined('GS_LEAD_SYNC_URI')         or define('GS_LEAD_SYNC_URI',         base_url('modules/gs_lead_sync/'));
 
 register_activation_hook(GS_LEAD_SYNC_MODULE_NAME, 'gs_lead_sync_activation_hook');
 register_uninstall_hook(GS_LEAD_SYNC_MODULE_NAME,  'gs_lead_sync_uninstall_hook');
@@ -38,8 +37,9 @@ function gs_lead_sync_assets()
     if (strpos($uri, 'gs_lead_sync') === false) {
         return;
     }
-    echo '<link rel="stylesheet" href="' . GS_LEAD_SYNC_URI . 'assets/css/gs_lead_sync.css">' . "\n";
-    echo '<script src="'                 . GS_LEAD_SYNC_URI . 'assets/js/gs_lead_sync.js"></script>' . "\n";
+    $module_uri = base_url('modules/gs_lead_sync/');
+    echo '<link rel="stylesheet" href="' . $module_uri . 'assets/css/gs_lead_sync.css">' . "\n";
+    echo '<script src="'                 . $module_uri . 'assets/js/gs_lead_sync.js"></script>' . "\n";
 }
 
 function gs_lead_sync_menu()
