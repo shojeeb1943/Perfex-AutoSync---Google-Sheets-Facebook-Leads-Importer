@@ -6,6 +6,7 @@ class Gs_lead_sync extends AdminController
     public function __construct()
     {
         parent::__construct();
+        $this->_ensure_tables();
         $this->load->model('gs_lead_sync/sheet_config_model');
         $this->load->model('gs_lead_sync/sync_log_model');
     }
@@ -143,7 +144,11 @@ class Gs_lead_sync extends AdminController
 
         $column_mapping = $this->input->post('column_mapping');
         if (!is_array($column_mapping)) { $column_mapping = array(); }
-        $column_mapping = array_filter($column_mapping, function ($v) { return trim((string)$v) !== ''; });
+        $filtered = array();
+        foreach ($column_mapping as $k => $v) {
+            if (trim((string)$v) !== '') { $filtered[$k] = $v; }
+        }
+        $column_mapping = $filtered;
 
         $spreadsheet_id = trim((string)$this->input->post('spreadsheet_id'));
         if (preg_match('/\/spreadsheets\/d\/([a-zA-Z0-9_\-]+)/', $spreadsheet_id, $m)) {
@@ -153,15 +158,25 @@ class Gs_lead_sync extends AdminController
         $desc_cols = $this->input->post('description_columns');
         if (!is_array($desc_cols)) { $desc_cols = array(); }
 
+        $sheet_tab = trim((string)$this->input->post('sheet_tab'));
+        if ($sheet_tab === '') { $sheet_tab = 'Sheet1'; }
+
+        $id_column = trim((string)$this->input->post('id_column'));
+        if ($id_column === '') { $id_column = 'id'; }
+
+        $lead_status  = (int)$this->input->post('lead_status_id');
+        $lead_source  = (int)$this->input->post('lead_source_id');
+        $def_assignee = (int)$this->input->post('default_assignee');
+
         $data = array(
             'name'                => trim((string)$this->input->post('name')),
             'spreadsheet_id'      => $spreadsheet_id,
-            'sheet_tab'           => trim((string)$this->input->post('sheet_tab')) ? trim((string)$this->input->post('sheet_tab')) : 'Sheet1',
-            'lead_status_id'      => ((int)$this->input->post('lead_status_id'))   ? (int)$this->input->post('lead_status_id')   : null,
-            'lead_source_id'      => ((int)$this->input->post('lead_source_id'))   ? (int)$this->input->post('lead_source_id')   : null,
-            'default_assignee'    => ((int)$this->input->post('default_assignee')) ? (int)$this->input->post('default_assignee') : null,
-            'id_column'           => trim((string)$this->input->post('id_column')) ? trim((string)$this->input->post('id_column')) : 'id',
-            'column_mapping'      => json_encode((object)$column_mapping),
+            'sheet_tab'           => $sheet_tab,
+            'lead_status_id'      => $lead_status  > 0 ? $lead_status  : 0,
+            'lead_source_id'      => $lead_source  > 0 ? $lead_source  : 0,
+            'default_assignee'    => $def_assignee > 0 ? $def_assignee : 0,
+            'id_column'           => $id_column,
+            'column_mapping'      => json_encode(count($column_mapping) > 0 ? (object)$column_mapping : new stdClass()),
             'description_columns' => json_encode($desc_cols),
             'is_active'           => $this->input->post('is_active') ? 1 : 0,
         );
@@ -173,11 +188,15 @@ class Gs_lead_sync extends AdminController
         }
 
         if ($id) {
-            $this->sheet_config_model->update($id, $data);
-            set_alert('success', 'Sheet configuration updated.');
+            $result = $this->sheet_config_model->update($id, $data);
         } else {
-            $this->sheet_config_model->insert($data);
-            set_alert('success', 'Sheet configuration added.');
+            $result = $this->sheet_config_model->insert($data);
+        }
+
+        if ($result === false) {
+            set_alert('danger', 'Database error — check the error log for details.');
+        } else {
+            set_alert('success', $id ? 'Sheet configuration updated.' : 'Sheet configuration added.');
         }
         redirect(admin_url('gs_lead_sync'));
     }
@@ -399,5 +418,73 @@ class Gs_lead_sync extends AdminController
         if (strtolower($this->input->method()) !== 'post') {
             show_404();
         }
+    }
+
+    /**
+     * Safety net: create tables if they don't exist.
+     * This handles the case where activation failed or tables were dropped.
+     */
+    private function _ensure_tables()
+    {
+        $prev = $this->db->db_debug;
+        $this->db->db_debug = false;
+
+        $p = db_prefix();
+
+        if (!$this->db->table_exists($p . 'gs_lead_sync_sheets')) {
+            $this->db->query("
+                CREATE TABLE IF NOT EXISTS `{$p}gs_lead_sync_sheets` (
+                    `id`                  INT(11) UNSIGNED NOT NULL AUTO_INCREMENT,
+                    `name`                VARCHAR(255) NOT NULL DEFAULT '',
+                    `spreadsheet_id`      VARCHAR(255) NOT NULL DEFAULT '',
+                    `sheet_tab`           VARCHAR(255) NOT NULL DEFAULT 'Sheet1',
+                    `lead_status_id`      INT(11) NOT NULL DEFAULT 0,
+                    `lead_source_id`      INT(11) NOT NULL DEFAULT 0,
+                    `default_assignee`    INT(11) NOT NULL DEFAULT 0,
+                    `column_mapping`      TEXT NULL,
+                    `description_columns` TEXT NULL,
+                    `id_column`           VARCHAR(100) NOT NULL DEFAULT 'id',
+                    `is_active`           TINYINT(1) NOT NULL DEFAULT 1,
+                    `last_run_at`         DATETIME NULL DEFAULT NULL,
+                    `created_at`          DATETIME NULL DEFAULT NULL,
+                    `updated_at`          DATETIME NULL DEFAULT NULL,
+                    PRIMARY KEY (`id`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8
+            ");
+        }
+
+        if (!$this->db->table_exists($p . 'gs_lead_sync_imported')) {
+            $this->db->query("
+                CREATE TABLE IF NOT EXISTS `{$p}gs_lead_sync_imported` (
+                    `id`              INT(11) UNSIGNED NOT NULL AUTO_INCREMENT,
+                    `sheet_config_id` INT(11) UNSIGNED NOT NULL,
+                    `row_lead_id`     VARCHAR(191) NOT NULL DEFAULT '',
+                    `perfex_lead_id`  INT(11) NOT NULL DEFAULT 0,
+                    `imported_at`     DATETIME NULL DEFAULT NULL,
+                    PRIMARY KEY (`id`),
+                    UNIQUE KEY `unique_import` (`sheet_config_id`, `row_lead_id`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8
+            ");
+        }
+
+        if (!$this->db->table_exists($p . 'gs_lead_sync_logs')) {
+            $this->db->query("
+                CREATE TABLE IF NOT EXISTS `{$p}gs_lead_sync_logs` (
+                    `id`              INT(11) UNSIGNED NOT NULL AUTO_INCREMENT,
+                    `sheet_config_id` INT(11) NOT NULL DEFAULT 0,
+                    `triggered_by`    VARCHAR(50) NOT NULL DEFAULT 'manual',
+                    `rows_fetched`    INT(11) NOT NULL DEFAULT 0,
+                    `rows_imported`   INT(11) NOT NULL DEFAULT 0,
+                    `rows_skipped`    INT(11) NOT NULL DEFAULT 0,
+                    `rows_failed`     INT(11) NOT NULL DEFAULT 0,
+                    `error_details`   TEXT NULL,
+                    `started_at`      DATETIME NULL DEFAULT NULL,
+                    `finished_at`     DATETIME NULL DEFAULT NULL,
+                    PRIMARY KEY (`id`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8
+            ");
+        }
+
+        $this->db->db_debug = $prev;
     }
 }

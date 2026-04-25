@@ -107,9 +107,9 @@ function gs_lead_sync_activate()
             `name`                VARCHAR(255) NOT NULL DEFAULT '',
             `spreadsheet_id`      VARCHAR(255) NOT NULL DEFAULT '',
             `sheet_tab`           VARCHAR(255) NOT NULL DEFAULT 'Sheet1',
-            `lead_status_id`      INT(11) NULL DEFAULT NULL,
-            `lead_source_id`      INT(11) NULL DEFAULT NULL,
-            `default_assignee`    INT(11) NULL DEFAULT NULL,
+            `lead_status_id`      INT(11) NOT NULL DEFAULT 0,
+            `lead_source_id`      INT(11) NOT NULL DEFAULT 0,
+            `default_assignee`    INT(11) NOT NULL DEFAULT 0,
             `column_mapping`      TEXT NULL,
             `description_columns` TEXT NULL,
             `id_column`           VARCHAR(100) NOT NULL DEFAULT 'id',
@@ -118,7 +118,7 @@ function gs_lead_sync_activate()
             `created_at`          DATETIME NULL DEFAULT NULL,
             `updated_at`          DATETIME NULL DEFAULT NULL,
             PRIMARY KEY (`id`)
-        ) ENGINE=InnoDB DEFAULT CHARSET=" . $CI->db->char_set . ";
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8
     ");
 
     // Table 2: dedup tracker
@@ -127,18 +127,18 @@ function gs_lead_sync_activate()
             `id`              INT(11) UNSIGNED NOT NULL AUTO_INCREMENT,
             `sheet_config_id` INT(11) UNSIGNED NOT NULL,
             `row_lead_id`     VARCHAR(191) NOT NULL DEFAULT '',
-            `perfex_lead_id`  INT(11) NULL DEFAULT NULL,
+            `perfex_lead_id`  INT(11) NOT NULL DEFAULT 0,
             `imported_at`     DATETIME NULL DEFAULT NULL,
             PRIMARY KEY (`id`),
             UNIQUE KEY `unique_import` (`sheet_config_id`, `row_lead_id`)
-        ) ENGINE=InnoDB DEFAULT CHARSET=" . $CI->db->char_set . ";
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8
     ");
 
     // Table 3: sync run logs
     $CI->db->query("
         CREATE TABLE IF NOT EXISTS `{$p}gs_lead_sync_logs` (
             `id`              INT(11) UNSIGNED NOT NULL AUTO_INCREMENT,
-            `sheet_config_id` INT(11) NULL DEFAULT NULL,
+            `sheet_config_id` INT(11) NOT NULL DEFAULT 0,
             `triggered_by`    VARCHAR(50) NOT NULL DEFAULT 'manual',
             `rows_fetched`    INT(11) NOT NULL DEFAULT 0,
             `rows_imported`   INT(11) NOT NULL DEFAULT 0,
@@ -148,7 +148,7 @@ function gs_lead_sync_activate()
             `started_at`      DATETIME NULL DEFAULT NULL,
             `finished_at`     DATETIME NULL DEFAULT NULL,
             PRIMARY KEY (`id`)
-        ) ENGINE=InnoDB DEFAULT CHARSET=" . $CI->db->char_set . ";
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8
     ");
 
     // Seed options

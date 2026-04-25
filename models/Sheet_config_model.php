@@ -13,44 +13,86 @@ class Sheet_config_model extends App_Model
 
     public function get_all()
     {
-        return $this->db->get($this->_table)->result_array();
+        $prev = $this->db->db_debug;
+        $this->db->db_debug = false;
+        $q = $this->db->get($this->_table);
+        $this->db->db_debug = $prev;
+        if (!$q) { return array(); }
+        return $q->result_array();
     }
 
     public function get($id)
     {
-        return $this->db->where('id', (int)$id)->get($this->_table)->row_array();
+        $prev = $this->db->db_debug;
+        $this->db->db_debug = false;
+        $q = $this->db->where('id', (int)$id)->get($this->_table);
+        $this->db->db_debug = $prev;
+        if (!$q) { return null; }
+        return $q->row_array();
     }
 
     public function get_active_sheets()
     {
-        return $this->db->where('is_active', 1)->get($this->_table)->result_array();
+        $prev = $this->db->db_debug;
+        $this->db->db_debug = false;
+        $q = $this->db->where('is_active', 1)->get($this->_table);
+        $this->db->db_debug = $prev;
+        if (!$q) { return array(); }
+        return $q->result_array();
     }
 
     public function insert($data)
     {
         $data['created_at'] = date('Y-m-d H:i:s');
         $data['updated_at'] = date('Y-m-d H:i:s');
-        $this->db->insert($this->_table, $data);
-        return $this->db->insert_id();
+
+        $prev = $this->db->db_debug;
+        $this->db->db_debug = false;
+        $ok = $this->db->insert($this->_table, $data);
+        $err = $this->db->error();
+        $insert_id = $this->db->insert_id();
+        $this->db->db_debug = $prev;
+
+        if (!$ok || (isset($err['code']) && $err['code'] != 0)) {
+            log_message('error', 'gs_lead_sync insert failed: ' . json_encode($err));
+            return false;
+        }
+        return $insert_id;
     }
 
     public function update($id, $data)
     {
         $data['updated_at'] = date('Y-m-d H:i:s');
+
+        $prev = $this->db->db_debug;
+        $this->db->db_debug = false;
         $this->db->where('id', (int)$id)->update($this->_table, $data);
-        return $this->db->affected_rows() > 0;
+        $err = $this->db->error();
+        $this->db->db_debug = $prev;
+
+        if (isset($err['code']) && $err['code'] != 0) {
+            log_message('error', 'gs_lead_sync update failed: ' . json_encode($err));
+            return false;
+        }
+        return true;
     }
 
     public function delete($id)
     {
+        $prev = $this->db->db_debug;
+        $this->db->db_debug = false;
         $this->db->where('id', (int)$id)->delete($this->_table);
         $this->db->where('sheet_config_id', (int)$id)->delete(db_prefix() . 'gs_lead_sync_imported');
+        $this->db->db_debug = $prev;
     }
 
     public function mark_run($id)
     {
+        $prev = $this->db->db_debug;
+        $this->db->db_debug = false;
         $this->db->where('id', (int)$id)->update($this->_table, array(
             'last_run_at' => date('Y-m-d H:i:s'),
         ));
+        $this->db->db_debug = $prev;
     }
 }
