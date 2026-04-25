@@ -112,14 +112,14 @@
                   $duration = $duration_sec !== null
                     ? ($duration_sec < 60 ? $duration_sec . 's' : round($duration_sec / 60, 1) . 'm')
                     : '—';
-                  $errors = json_decode($log['error_details'] ?? '[]', true) ?: [];
+                  $errors = json_decode(isset($log['error_details']) ? $log['error_details'] : '[]', true) ?: [];
                   $has_errors = !empty($errors) || $log['rows_failed'] > 0;
                   $row_style = $has_errors ? 'border-left:3px solid #d9534f;' : '';
                 ?>
                 <tr style="<?php echo $row_style; ?>">
                   <td style="padding:12px 16px; vertical-align:middle; color:#9ca3af; font-size:12px;"><?php echo $log['id']; ?></td>
                   <td style="padding:12px 16px; vertical-align:middle;">
-                    <strong style="color:#1f2937;"><?php echo htmlspecialchars($log['sheet_name'] ?? '(deleted)'); ?></strong>
+                    <strong style="color:#1f2937;"><?php echo htmlspecialchars(isset($log['sheet_name']) ? $log['sheet_name'] : '(deleted)'); ?></strong>
                   </td>
                   <td style="padding:12px 16px; vertical-align:middle;">
                     <?php if ($log['triggered_by'] === 'cron'): ?>

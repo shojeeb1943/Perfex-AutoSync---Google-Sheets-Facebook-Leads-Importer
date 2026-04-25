@@ -92,9 +92,9 @@
               <label>Default Assignee</label>
               <select name="default_assignee" class="form-control">
                 <option value="">— Unassigned —</option>
-                <?php foreach (($staff_list ?? []) as $st):
-                    $st_name = trim(($st['firstname'] ?? '') . ' ' . ($st['lastname'] ?? ''));
-                    if ($st_name === '') { $st_name = $st['email'] ?? ('Staff #' . $st['staffid']); }
+                <?php foreach ((isset($staff_list) ? $staff_list : []) as $st):
+                    $st_name = trim((isset($st['firstname']) ? $st['firstname'] : '') . ' ' . (isset($st['lastname']) ? $st['lastname'] : ''));
+                    if ($st_name === '') { $st_name = isset($st['email']) ? $st['email'] : ('Staff #' . $st['staffid']); }
                 ?>
                 <option value="<?php echo (int)$st['staffid']; ?>"
                   <?php echo ($s_assignee !== '' && (int)$s_assignee === (int)$st['staffid']) ? 'selected' : ''; ?>>

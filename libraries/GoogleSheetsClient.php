@@ -3,16 +3,12 @@ defined('BASEPATH') or exit('No direct script access allowed');
 
 /**
  * Lightweight Google Sheets API v4 client using a Service Account.
- * No Composer or vendor dependencies — uses PHP's built-in openssl and cURL.
- *
- * Token cache is static so that multiple sheet syncs in a single request
- * share one OAuth round-trip (keyed by service-account client_email).
+ * No Composer dependencies — uses PHP built-in openssl + cURL.
  */
 class Gs_GoogleSheetsClient
 {
     private $credentials;
-
-    private static $token_cache = []; // [client_email => ['token' => ..., 'expires' => ts]]
+    private static $token_cache = [];
 
     public function __construct($service_account_json)
     {
@@ -20,47 +16,48 @@ class Gs_GoogleSheetsClient
             throw new Exception('Google Service Account JSON is not configured.');
         }
         $this->credentials = json_decode($service_account_json, true);
-        if (!$this->credentials || empty($this->credentials['private_key']) || empty($this->credentials['client_email'])) {
-            throw new Exception('Invalid Google Service Account JSON — missing private_key or client_email.');
+        if (!is_array($this->credentials) || empty($this->credentials['private_key']) || empty($this->credentials['client_email'])) {
+            throw new Exception('Invalid Service Account JSON — missing private_key or client_email.');
         }
     }
 
+    /**
+     * Get the header row (first row) of a sheet tab.
+     */
     public function get_headers($spreadsheet_id, $tab_name = 'Sheet1')
     {
         $range  = rawurlencode($tab_name . '!1:1');
         $data   = $this->_api_get($spreadsheet_id, $range);
-        $values = $data['values'] ?? [];
-        return $values[0] ?? [];
+        $values = isset($data['values']) ? $data['values'] : [];
+        return isset($values[0]) ? $values[0] : [];
     }
 
+    /**
+     * Get all rows (including header) from a sheet tab.
+     */
     public function get_rows($spreadsheet_id, $tab_name = 'Sheet1')
     {
         $range = rawurlencode($tab_name);
         $data  = $this->_api_get($spreadsheet_id, $range);
-        return $data['values'] ?? [];
+        return isset($data['values']) ? $data['values'] : [];
     }
 
     /**
-     * Force a full OAuth round-trip and return identifying info about the
-     * service account. Intended for the "Test Connection" UI button: any
-     * credential / network / SSL failure surfaces as an Exception with a
-     * specific message.
-     *
-     * @return array{client_email:string, project_id:?string, expires_in:int}
+     * Force a fresh OAuth round-trip — used by "Test Connection" button.
      */
     public function get_token_for_test()
     {
-        // Force a fresh token (don't use cached one) to actually exercise OAuth.
-        unset(self::$token_cache[$this->credentials['client_email']]);
+        $email = $this->credentials['client_email'];
+        unset(self::$token_cache[$email]);
         $this->_get_access_token();
         return [
-            'client_email' => $this->credentials['client_email'],
-            'project_id'   => $this->credentials['project_id'] ?? null,
-            'expires_in'   => self::$token_cache[$this->credentials['client_email']]['expires'] - time(),
+            'client_email' => $email,
+            'project_id'   => isset($this->credentials['project_id']) ? $this->credentials['project_id'] : null,
+            'expires_in'   => self::$token_cache[$email]['expires'] - time(),
         ];
     }
 
-    // -------------------------------------------------------------------------
+    // ─────────────────────────────────────────────────────────────────────────
 
     private function _api_get($spreadsheet_id, $encoded_range)
     {
@@ -83,7 +80,9 @@ class Gs_GoogleSheetsClient
         $body = json_decode($response, true);
 
         if ($http_code !== 200) {
-            $msg = $body['error']['message'] ?? ('HTTP ' . $http_code);
+            $msg = (is_array($body) && isset($body['error']['message']))
+                ? $body['error']['message']
+                : 'HTTP ' . $http_code;
             throw new Exception('Google Sheets API error: ' . $msg);
         }
 
@@ -95,11 +94,8 @@ class Gs_GoogleSheetsClient
         $email = $this->credentials['client_email'];
         $now   = time();
 
-        if (isset(self::$token_cache[$email])) {
-            $cached = self::$token_cache[$email];
-            if ($now < $cached['expires'] - 60) {
-                return $cached['token'];
-            }
+        if (isset(self::$token_cache[$email]) && $now < self::$token_cache[$email]['expires'] - 60) {
+            return self::$token_cache[$email]['token'];
         }
 
         $payload = [
@@ -130,14 +126,17 @@ class Gs_GoogleSheetsClient
         }
 
         $token_data = json_decode($response, true);
-        if (empty($token_data['access_token'])) {
-            $msg = $token_data['error_description'] ?? $token_data['error'] ?? 'Unknown token error';
+        if (!is_array($token_data) || empty($token_data['access_token'])) {
+            $msg = isset($token_data['error_description'])
+                ? $token_data['error_description']
+                : (isset($token_data['error']) ? $token_data['error'] : 'Unknown token error');
             throw new Exception('Failed to get Google access token: ' . $msg);
         }
 
+        $expires_in = isset($token_data['expires_in']) ? (int) $token_data['expires_in'] : 3600;
         self::$token_cache[$email] = [
             'token'   => $token_data['access_token'],
-            'expires' => $now + ($token_data['expires_in'] ?? 3600),
+            'expires' => $now + $expires_in,
         ];
 
         return $token_data['access_token'];
@@ -145,30 +144,29 @@ class Gs_GoogleSheetsClient
 
     private function _curl_defaults()
     {
-        $defaults = [
+        $opts = [
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT        => 30,
             CURLOPT_CONNECTTIMEOUT => 10,
             CURLOPT_SSL_VERIFYPEER => true,
             CURLOPT_SSL_VERIFYHOST => 2,
         ];
-        // If PHP has a CA bundle configured, pass it explicitly so cURL on
-        // Windows/XAMPP (which often has no default) verifies correctly.
-        $cainfo = ini_get('curl.cainfo') ?: ini_get('openssl.cafile');
-        if ($cainfo && is_file($cainfo)) {
-            $defaults[CURLOPT_CAINFO] = $cainfo;
+        $cainfo = ini_get('curl.cainfo');
+        if (empty($cainfo)) {
+            $cainfo = ini_get('openssl.cafile');
         }
-        return $defaults;
+        if (!empty($cainfo) && is_file($cainfo)) {
+            $opts[CURLOPT_CAINFO] = $cainfo;
+        }
+        return $opts;
     }
 
     private function _friendly_curl_error($curl_error)
     {
-        if (stripos($curl_error, 'SSL certificate') !== false
-            || stripos($curl_error, 'unable to get local issuer') !== false
-            || stripos($curl_error, 'CA') !== false) {
+        if (stripos($curl_error, 'SSL') !== false || stripos($curl_error, 'CA') !== false) {
             return 'cURL SSL error: ' . $curl_error
-                . ' — Your PHP install has no CA bundle. On Windows/XAMPP, download cacert.pem from https://curl.se/ca/cacert.pem '
-                . 'and set curl.cainfo in php.ini to its path. See README Troubleshooting.';
+                . ' — Your PHP may not have a CA bundle. Download cacert.pem from https://curl.se/ca/cacert.pem'
+                . ' and set curl.cainfo in php.ini.';
         }
         return 'cURL error: ' . $curl_error;
     }
@@ -177,18 +175,18 @@ class Gs_GoogleSheetsClient
     {
         $header = ['alg' => 'RS256', 'typ' => 'JWT'];
 
-        $b64_header  = $this->_base64url(json_encode($header));
-        $b64_payload = $this->_base64url(json_encode($payload));
-        $signing_input = $b64_header . '.' . $b64_payload;
+        $b64h = $this->_base64url(json_encode($header));
+        $b64p = $this->_base64url(json_encode($payload));
+        $input = $b64h . '.' . $b64p;
 
-        $private_key = openssl_pkey_get_private($this->credentials['private_key']);
-        if (!$private_key) {
+        $pk = openssl_pkey_get_private($this->credentials['private_key']);
+        if (!$pk) {
             throw new Exception('Failed to load private key from Service Account JSON.');
         }
 
-        openssl_sign($signing_input, $signature, $private_key, OPENSSL_ALGO_SHA256);
+        openssl_sign($input, $sig, $pk, OPENSSL_ALGO_SHA256);
 
-        return $signing_input . '.' . $this->_base64url($signature);
+        return $input . '.' . $this->_base64url($sig);
     }
 
     private function _base64url($data)
