@@ -8,21 +8,9 @@ class Gs_SyncEngine
     public function __construct()
     {
         $this->CI =& get_instance();
-        // Be defensive — works whether called from controller (which loads
-        // these in its constructor) or from cron / CLI.
         $this->CI->load->model('gs_lead_sync/sheet_config_model');
         $this->CI->load->model('gs_lead_sync/sync_log_model');
         $this->CI->load->model('leads_model');
-    }
-
-    public function sync_all($triggered_by = 'cron')
-    {
-        $sheets  = $this->CI->sheet_config_model->get_active_sheets();
-        $results = [];
-        foreach ($sheets as $sheet) {
-            $results[$sheet['id']] = $this->sync_sheet((int)$sheet['id'], $triggered_by);
-        }
-        return $results;
     }
 
     public function sync_sheet($sheet_config_id, $triggered_by = 'manual')
@@ -73,8 +61,6 @@ class Gs_SyncEngine
 
         $id_col_index = array_search($id_column, $header, true);
 
-        // Without a working ID column we can't dedupe — refuse the run instead
-        // of silently re-importing every row on every cron tick.
         if ($id_col_index === false) {
             $msg = sprintf(
                 'Configured unique ID column "%s" not found in sheet header. Import aborted to prevent duplicate leads.',
@@ -85,13 +71,10 @@ class Gs_SyncEngine
             return array_merge($stats, ['error' => $msg]);
         }
 
-        // Column whitelist for insert — anything outside $crm_fields + system
-        // keys we set ourselves is discarded at the boundary.
-        $allowed = array_merge(
+        $allowed = array_flip(array_merge(
             array_keys(Gs_LeadMapper::$crm_fields),
             ['source', 'status', 'addedfrom', 'assigned']
-        );
-        $allowed = array_flip($allowed);
+        ));
 
         $addedfrom = function_exists('get_staff_user_id') ? (int)get_staff_user_id() : 0;
         $assignee  = !empty($config['default_assignee']) ? (int)$config['default_assignee'] : 0;
@@ -99,7 +82,6 @@ class Gs_SyncEngine
         foreach ($data_rows as $row_num => $row) {
             $row_lead_id = isset($row[$id_col_index]) ? trim((string)$row[$id_col_index]) : '';
 
-            // Rows with no ID are un-dedupable — skip with a logged reason.
             if ($row_lead_id === '') {
                 $stats['rows_skipped']++;
                 $stats['error_details'][] = 'Row ' . ($row_num + 2) . ': empty ID column value, skipped.';
@@ -117,7 +99,6 @@ class Gs_SyncEngine
                 continue;
             }
 
-            // Set source/status/assignee from the sheet config (not the sheet column).
             $lead_data['source']    = (int)$config['lead_source_id'];
             $lead_data['status']    = (int)$config['lead_status_id'];
             $lead_data['addedfrom'] = $addedfrom;
@@ -125,19 +106,13 @@ class Gs_SyncEngine
                 $lead_data['assigned'] = $assignee;
             }
 
-            // Trim to known columns; prevents a rogue column_mapping entry
-            // from smuggling unexpected keys into the insert.
             $lead_data = array_intersect_key($lead_data, $allowed);
 
             $this->CI->db->trans_start();
-
-            // leads_model::add handles hash, custom fields, hooks, activity log.
             $perfex_lead_id = $this->CI->leads_model->add($lead_data);
-
             if ($perfex_lead_id) {
                 $this->CI->sync_log_model->mark_imported($sheet_config_id, $row_lead_id, (int)$perfex_lead_id);
             }
-
             $this->CI->db->trans_complete();
 
             if ($this->CI->db->trans_status() === false || !$perfex_lead_id) {

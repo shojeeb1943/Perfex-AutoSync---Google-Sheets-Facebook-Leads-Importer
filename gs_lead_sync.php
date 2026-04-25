@@ -20,21 +20,11 @@ register_uninstall_hook(GS_LEAD_SYNC_MODULE_NAME,  'gs_lead_sync_uninstall_hook'
 hooks()->add_action('app_admin_head', 'gs_lead_sync_assets');
 hooks()->add_action('app_cron',       'gs_lead_sync_cron');
 hooks()->add_action('admin_init',     'gs_lead_sync_menu');
-hooks()->add_action('admin_init',     'gs_lead_sync_ensure_schema');
 
-/**
- * Inject CSS/JS only on this module's admin pages.
- * Previously fired on every admin request, bleeding label styles into the
- * entire CRM and risking JSON-response contamination on AJAX endpoints.
- */
 function gs_lead_sync_assets()
 {
     $CI =& get_instance();
-    // Perfex admin URLs are /admin/gs_lead_sync/... — segment(1)='admin',
-    // segment(2)='gs_lead_sync'. Match on segment(2) (or anywhere in the URI
-    // for safety against routing customisations).
-    $uri = $CI->uri->uri_string();
-    if (strpos($uri, 'gs_lead_sync') === false) {
+    if (strpos($CI->uri->uri_string(), 'gs_lead_sync') === false) {
         return;
     }
     $module_uri = base_url('modules/gs_lead_sync/');
@@ -60,10 +50,6 @@ function gs_lead_sync_menu()
     ]);
 }
 
-/**
- * Cron entry. Perfex fires app_cron roughly every 5 minutes; we filter each
- * sheet against its configured interval so we don't spam the Google API.
- */
 function gs_lead_sync_cron()
 {
     if (get_option('gs_lead_sync_cron_enabled') != '1') {
@@ -73,7 +59,6 @@ function gs_lead_sync_cron()
     $CI =& get_instance();
     $CI->load->model('gs_lead_sync/sheet_config_model');
     $CI->load->model('gs_lead_sync/sync_log_model');
-    $CI->load->model('leads_model');
     require_once GS_LEAD_SYNC_DIR . 'libraries/LeadMapper.php';
     require_once GS_LEAD_SYNC_DIR . 'libraries/GoogleSheetsClient.php';
     require_once GS_LEAD_SYNC_DIR . 'libraries/SyncEngine.php';
@@ -90,13 +75,9 @@ function gs_lead_sync_cron()
             continue;
         }
         $engine->sync_sheet((int)$sheet['id'], 'cron');
-        $CI->sheet_config_model->mark_run((int)$sheet['id']);
     }
 }
 
-/**
- * Map cron interval option to seconds.
- */
 function gs_lead_sync_interval_seconds($key)
 {
     switch ($key) {
@@ -106,34 +87,6 @@ function gs_lead_sync_interval_seconds($key)
         case '6hr':   return 21600;
         case 'daily': return 86400;
         default:      return 3600;
-    }
-}
-
-/**
- * Runs on every admin_init to ensure the DB columns are always up to date.
- * This covers existing installations where the activation hook didn't re-run
- * after a module update that added new columns (e.g. default_assignee).
- */
-function gs_lead_sync_ensure_schema()
-{
-    try {
-        $CI =& get_instance();
-        if (!$CI->db->table_exists(db_prefix() . 'gs_lead_sync_sheets')) {
-            return;
-        }
-        $CI->load->dbforge();
-        if (!$CI->db->field_exists('last_run_at', db_prefix() . 'gs_lead_sync_sheets')) {
-            $CI->dbforge->add_column(db_prefix() . 'gs_lead_sync_sheets', [
-                'last_run_at' => ['type' => 'DATETIME', 'null' => true],
-            ]);
-        }
-        if (!$CI->db->field_exists('default_assignee', db_prefix() . 'gs_lead_sync_sheets')) {
-            $CI->dbforge->add_column(db_prefix() . 'gs_lead_sync_sheets', [
-                'default_assignee' => ['type' => 'INT', 'constraint' => 11, 'null' => true],
-            ]);
-        }
-    } catch (Throwable $e) {
-        log_message('error', 'gs_lead_sync_ensure_schema: ' . $e->getMessage());
     }
 }
 

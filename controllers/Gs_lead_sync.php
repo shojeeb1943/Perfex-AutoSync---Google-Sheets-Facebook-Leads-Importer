@@ -104,7 +104,6 @@ class Gs_lead_sync extends AdminController
         $q = $this->db->get(db_prefix() . 'leads_sources');
         $out['lead_sources']  = $q ? $q->result_array() : [];
 
-        // Active staff for the Default Assignee dropdown.
         $q = $this->db->where('active', 1)
                       ->order_by('firstname', 'asc')
                       ->get(db_prefix() . 'staff');
@@ -173,9 +172,6 @@ class Gs_lead_sync extends AdminController
         redirect(admin_url('gs_lead_sync'));
     }
 
-    // AJAX: POST admin/gs_lead_sync/test_connection
-    // Verifies that the saved Service Account JSON can authenticate against
-    // Google's OAuth endpoint. Doesn't touch any spreadsheet.
     public function test_connection()
     {
         $this->_require_post();
@@ -183,8 +179,6 @@ class Gs_lead_sync extends AdminController
 
         require_once GS_LEAD_SYNC_DIR . 'libraries/GoogleSheetsClient.php';
 
-        // Allow testing freshly-pasted JSON before the user clicks Save, by
-        // accepting the payload from POST and falling back to the saved option.
         $service_account_json = trim((string)$this->input->post('service_account_json'));
         if ($service_account_json === '') {
             $service_account_json = (string)get_option('gs_lead_sync_service_account_json');
@@ -201,10 +195,7 @@ class Gs_lead_sync extends AdminController
 
         try {
             $client = new Gs_GoogleSheetsClient($service_account_json);
-            // get_token_for_test() walks the full JWT/OAuth round-trip so we
-            // catch every credential, network, or SSL failure mode.
-            $info = $client->get_token_for_test();
-
+            $info   = $client->get_token_for_test();
             $this->_json([
                 'success'   => true,
                 'message'   => 'Google authentication succeeded. Service account is valid and reachable.',
@@ -220,7 +211,6 @@ class Gs_lead_sync extends AdminController
         }
     }
 
-    // AJAX: POST admin/gs_lead_sync/detect_columns
     public function detect_columns()
     {
         $this->_require_post();
@@ -262,13 +252,11 @@ class Gs_lead_sync extends AdminController
         }
     }
 
-    // AJAX: POST admin/gs_lead_sync/sync_now/{id}
     public function sync_now($id)
     {
         $this->_require_post();
         if (!is_admin()) { show_404(); }
 
-        // Basic rate limit: one manual sync per sheet per 10 seconds.
         $rate_key = 'gs_lead_sync_last_manual_' . (int)$id;
         $last_hit = $this->session->userdata($rate_key);
         if ($last_hit && (time() - (int)$last_hit) < 10) {
@@ -325,6 +313,8 @@ class Gs_lead_sync extends AdminController
         $data['page']       = $page;
         $data['limit']      = $limit;
         $data['title']      = 'Sync Log';
+        $data['csrf_name']  = $this->security->get_csrf_token_name();
+        $data['csrf_hash']  = $this->security->get_csrf_hash();
 
         $this->load->view('gs_lead_sync/sync_log/index', $data);
     }
@@ -338,13 +328,6 @@ class Gs_lead_sync extends AdminController
         redirect(admin_url('gs_lead_sync/sync_log'));
     }
 
-    // -------------------------------------------------------------------------
-
-    /**
-     * Flush any buffered output (hooks, notices) and emit a pure JSON body.
-     * Prior versions relied on set_output() alone, which doesn't stop stray
-     * echoes from other app_admin_head hooks leaking into AJAX responses.
-     */
     private function _json($payload)
     {
         while (ob_get_level() > 0) {

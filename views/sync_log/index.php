@@ -17,7 +17,7 @@
             </a>
             <?php if (!empty($logs)): ?>
             <form method="POST" action="<?php echo admin_url('gs_lead_sync/clear_logs'); ?>" class="display-inline" style="margin:0;">
-              <?php echo form_hidden($this->security->get_csrf_token_name(), $this->security->get_csrf_hash()); ?>
+              <?php echo form_hidden($csrf_name, $csrf_hash); ?>
               <button type="submit" class="btn btn-danger btn-sm"
                       onclick="return confirm('This will permanently delete all sync logs. Continue?')">
                 <i class="fa fa-trash"></i> Clear All Logs
