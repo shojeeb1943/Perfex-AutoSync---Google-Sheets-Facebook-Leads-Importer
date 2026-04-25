@@ -24,3 +24,6 @@ desktop.ini
 # PHP environment
 .env
 *.log
+
+# Deploy archives
+*.zip
