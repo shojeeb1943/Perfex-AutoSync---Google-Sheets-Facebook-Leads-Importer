@@ -121,6 +121,14 @@ function gs_lead_sync_activate()
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8
     ");
 
+    // Add missing columns to existing table (upgrade path)
+    if (!$CI->db->field_exists('default_assignee', $p . 'gs_lead_sync_sheets')) {
+        $CI->db->query("ALTER TABLE `{$p}gs_lead_sync_sheets` ADD COLUMN `default_assignee` INT(11) NOT NULL DEFAULT 0 AFTER `lead_source_id`");
+    }
+    if (!$CI->db->field_exists('last_run_at', $p . 'gs_lead_sync_sheets')) {
+        $CI->db->query("ALTER TABLE `{$p}gs_lead_sync_sheets` ADD COLUMN `last_run_at` DATETIME NULL DEFAULT NULL AFTER `is_active`");
+    }
+
     // Table 2: dedup tracker
     $CI->db->query("
         CREATE TABLE IF NOT EXISTS `{$p}gs_lead_sync_imported` (

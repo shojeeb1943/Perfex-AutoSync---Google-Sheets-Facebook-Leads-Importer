@@ -428,10 +428,11 @@ class Gs_lead_sync extends AdminController
         $d = $this->db->db_debug;
         $this->db->db_debug = false;
         $p = db_prefix();
+        $t = $p . 'gs_lead_sync_sheets';
 
-        if (!$this->db->table_exists($p . 'gs_lead_sync_sheets')) {
+        if (!$this->db->table_exists($t)) {
             $this->db->query("
-                CREATE TABLE IF NOT EXISTS `{$p}gs_lead_sync_sheets` (
+                CREATE TABLE IF NOT EXISTS `{$t}` (
                     `id`                  INT(11) UNSIGNED NOT NULL AUTO_INCREMENT,
                     `name`                VARCHAR(255) NOT NULL DEFAULT '',
                     `spreadsheet_id`      VARCHAR(255) NOT NULL DEFAULT '',
@@ -449,6 +450,14 @@ class Gs_lead_sync extends AdminController
                     PRIMARY KEY (`id`)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8
             ");
+        } else {
+            // Add missing columns to existing table
+            if (!$this->db->field_exists('default_assignee', $t)) {
+                $this->db->query("ALTER TABLE `{$t}` ADD COLUMN `default_assignee` INT(11) NOT NULL DEFAULT 0 AFTER `lead_source_id`");
+            }
+            if (!$this->db->field_exists('last_run_at', $t)) {
+                $this->db->query("ALTER TABLE `{$t}` ADD COLUMN `last_run_at` DATETIME NULL DEFAULT NULL AFTER `is_active`");
+            }
         }
 
         if (!$this->db->table_exists($p . 'gs_lead_sync_imported')) {
