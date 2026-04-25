@@ -11,7 +11,7 @@ class Gs_lead_sync extends AdminController
         $this->load->model('gs_lead_sync/sync_log_model');
     }
 
-    /* ──── Diagnostic: visit /admin/gs_lead_sync/diag to debug ──── */
+    /* ──── Diagnostic ──── */
 
     public function diag()
     {
@@ -31,6 +31,21 @@ class Gs_lead_sync extends AdminController
         echo "sheets table:   " . ($this->db->table_exists($p . 'gs_lead_sync_sheets')   ? 'EXISTS' : 'MISSING') . "\n";
         echo "imported table: " . ($this->db->table_exists($p . 'gs_lead_sync_imported') ? 'EXISTS' : 'MISSING') . "\n";
         echo "logs table:     " . ($this->db->table_exists($p . 'gs_lead_sync_logs')     ? 'EXISTS' : 'MISSING') . "\n\n";
+
+        // Show actual column definitions
+        if ($this->db->table_exists($p . 'gs_lead_sync_sheets')) {
+            echo "--- Sheets Table Columns ---\n";
+            $d = $this->db->db_debug;
+            $this->db->db_debug = false;
+            $cols = $this->db->query("SHOW COLUMNS FROM `{$p}gs_lead_sync_sheets`");
+            $this->db->db_debug = $d;
+            if ($cols) {
+                foreach ($cols->result_array() as $c) {
+                    echo "  " . $c['Field'] . ": " . $c['Type'] . " " . ($c['Null'] === 'YES' ? 'NULL' : 'NOT NULL') . " default=" . var_export($c['Default'], true) . "\n";
+                }
+            }
+            echo "\n";
+        }
 
         echo "--- Options ---\n";
         echo "cron_enabled:    " . var_export(get_option('gs_lead_sync_cron_enabled'), true) . "\n";
@@ -55,6 +70,37 @@ class Gs_lead_sync extends AdminController
             echo $f . ': ' . (file_exists($path) ? 'OK (' . filesize($path) . ' bytes)' : 'MISSING!') . "\n";
         }
 
+        echo "\n--- Test DB Insert ---\n";
+        $d = $this->db->db_debug;
+        $this->db->db_debug = false;
+        $test_data = array(
+            'name'                => '__diag_test__',
+            'spreadsheet_id'      => 'test_id',
+            'sheet_tab'           => 'Sheet1',
+            'lead_status_id'      => 0,
+            'lead_source_id'      => 0,
+            'default_assignee'    => 0,
+            'column_mapping'      => '{}',
+            'description_columns' => '[]',
+            'id_column'           => 'id',
+            'is_active'           => 0,
+            'created_at'          => date('Y-m-d H:i:s'),
+            'updated_at'          => date('Y-m-d H:i:s'),
+        );
+        $ok = $this->db->insert($p . 'gs_lead_sync_sheets', $test_data);
+        $err = $this->db->error();
+        $test_id = $this->db->insert_id();
+        if ($ok && (!isset($err['code']) || $err['code'] == 0)) {
+            echo "INSERT: OK (id={$test_id})\n";
+            $this->db->where('id', $test_id)->delete($p . 'gs_lead_sync_sheets');
+            echo "DELETE: OK (cleaned up)\n";
+        } else {
+            echo "INSERT FAILED!\n";
+            echo "Error code: " . (isset($err['code']) ? $err['code'] : 'none') . "\n";
+            echo "Error msg:  " . (isset($err['message']) ? $err['message'] : 'none') . "\n";
+        }
+        $this->db->db_debug = $d;
+
         echo "\n--- PHP Extensions ---\n";
         echo "curl:    " . (extension_loaded('curl')    ? 'YES' : 'NO') . "\n";
         echo "openssl: " . (extension_loaded('openssl') ? 'YES' : 'NO') . "\n";
@@ -72,11 +118,13 @@ class Gs_lead_sync extends AdminController
         $data = array();
         $data['sheets'] = $this->sheet_config_model->get_all();
 
+        $d = $this->db->db_debug;
+        $this->db->db_debug = false;
         $q = $this->db->get(db_prefix() . 'leads_status');
-        $data['lead_statuses'] = $q ? $q->result_array() : array();
-
+        $data['lead_statuses'] = ($q && $q->num_rows() >= 0) ? $q->result_array() : array();
         $q = $this->db->get(db_prefix() . 'leads_sources');
-        $data['lead_sources']  = $q ? $q->result_array() : array();
+        $data['lead_sources']  = ($q && $q->num_rows() >= 0) ? $q->result_array() : array();
+        $this->db->db_debug = $d;
 
         $data['title'] = 'Google Sheets Lead Sync';
 
@@ -137,7 +185,7 @@ class Gs_lead_sync extends AdminController
 
     public function save_sheet()
     {
-        $this->_require_post();
+        if (strtolower($this->input->method()) !== 'post') { show_404(); }
         if (!is_admin()) { show_404(); }
 
         $id = (int)$this->input->post('id');
@@ -146,9 +194,9 @@ class Gs_lead_sync extends AdminController
         if (!is_array($column_mapping)) { $column_mapping = array(); }
         $filtered = array();
         foreach ($column_mapping as $k => $v) {
-            if (trim((string)$v) !== '') { $filtered[$k] = $v; }
+            $val = trim((string)$v);
+            if ($val !== '') { $filtered[$k] = $val; }
         }
-        $column_mapping = $filtered;
 
         $spreadsheet_id = trim((string)$this->input->post('spreadsheet_id'));
         if (preg_match('/\/spreadsheets\/d\/([a-zA-Z0-9_\-]+)/', $spreadsheet_id, $m)) {
@@ -164,49 +212,45 @@ class Gs_lead_sync extends AdminController
         $id_column = trim((string)$this->input->post('id_column'));
         if ($id_column === '') { $id_column = 'id'; }
 
-        $lead_status  = (int)$this->input->post('lead_status_id');
-        $lead_source  = (int)$this->input->post('lead_source_id');
-        $def_assignee = (int)$this->input->post('default_assignee');
-
         $data = array(
             'name'                => trim((string)$this->input->post('name')),
             'spreadsheet_id'      => $spreadsheet_id,
             'sheet_tab'           => $sheet_tab,
-            'lead_status_id'      => $lead_status  > 0 ? $lead_status  : 0,
-            'lead_source_id'      => $lead_source  > 0 ? $lead_source  : 0,
-            'default_assignee'    => $def_assignee > 0 ? $def_assignee : 0,
+            'lead_status_id'      => max(0, (int)$this->input->post('lead_status_id')),
+            'lead_source_id'      => max(0, (int)$this->input->post('lead_source_id')),
+            'default_assignee'    => max(0, (int)$this->input->post('default_assignee')),
             'id_column'           => $id_column,
-            'column_mapping'      => json_encode(count($column_mapping) > 0 ? (object)$column_mapping : new stdClass()),
-            'description_columns' => json_encode($desc_cols),
+            'column_mapping'      => json_encode(count($filtered) > 0 ? (object)$filtered : new stdClass()),
+            'description_columns' => json_encode(array_values($desc_cols)),
             'is_active'           => $this->input->post('is_active') ? 1 : 0,
         );
 
-        if (empty($data['name']) || empty($data['spreadsheet_id'])) {
+        if ($data['name'] === '' || $data['spreadsheet_id'] === '') {
             set_alert('danger', 'Name and Spreadsheet ID are required.');
             redirect($id ? admin_url('gs_lead_sync/edit_sheet/' . $id) : admin_url('gs_lead_sync/add_sheet'));
             return;
         }
 
-        if ($id) {
+        if ($id > 0) {
             $result = $this->sheet_config_model->update($id, $data);
         } else {
             $result = $this->sheet_config_model->insert($data);
         }
 
         if ($result === false) {
-            set_alert('danger', 'Database error — check the error log for details.');
+            set_alert('danger', 'Database error saving sheet. Check application/logs/ for details.');
         } else {
-            set_alert('success', $id ? 'Sheet configuration updated.' : 'Sheet configuration added.');
+            set_alert('success', $id > 0 ? 'Sheet updated.' : 'Sheet added.');
         }
         redirect(admin_url('gs_lead_sync'));
     }
 
     public function delete_sheet($id)
     {
-        $this->_require_post();
+        if (strtolower($this->input->method()) !== 'post') { show_404(); }
         if (!is_admin()) { show_404(); }
         $this->sheet_config_model->delete((int)$id);
-        set_alert('success', 'Sheet configuration deleted.');
+        set_alert('success', 'Sheet deleted.');
         redirect(admin_url('gs_lead_sync'));
     }
 
@@ -214,7 +258,7 @@ class Gs_lead_sync extends AdminController
 
     public function save_settings()
     {
-        $this->_require_post();
+        if (strtolower($this->input->method()) !== 'post') { show_404(); }
         if (!is_admin()) { show_404(); }
 
         $json_input = $this->input->post('service_account_json');
@@ -229,7 +273,7 @@ class Gs_lead_sync extends AdminController
         }
 
         update_option('gs_lead_sync_cron_enabled',    $this->input->post('cron_enabled')    ? '1' : '0');
-        update_option('gs_lead_sync_cron_interval',   $this->input->post('cron_interval'));
+        update_option('gs_lead_sync_cron_interval',   (string)$this->input->post('cron_interval'));
         update_option('gs_lead_sync_skip_test_leads', $this->input->post('skip_test_leads') ? '1' : '0');
 
         set_alert('success', 'Settings saved.');
@@ -260,18 +304,18 @@ class Gs_lead_sync extends AdminController
 
     public function clear_logs()
     {
-        $this->_require_post();
+        if (strtolower($this->input->method()) !== 'post') { show_404(); }
         if (!is_admin()) { show_404(); }
         $this->sync_log_model->clear_logs();
         set_alert('success', 'Sync log cleared.');
         redirect(admin_url('gs_lead_sync/sync_log'));
     }
 
-    /* ──── AJAX: Detect Columns ──── */
+    /* ──── AJAX ──── */
 
     public function detect_columns()
     {
-        $this->_require_post();
+        if (strtolower($this->input->method()) !== 'post') { show_404(); }
         if (!is_admin()) { show_404(); }
 
         require_once GS_LEAD_SYNC_DIR . 'libraries/GoogleSheetsClient.php';
@@ -283,7 +327,7 @@ class Gs_lead_sync extends AdminController
         $tab = trim((string)$this->input->post('sheet_tab'));
         if ($tab === '') { $tab = 'Sheet1'; }
 
-        if (empty($spreadsheet_id)) {
+        if ($spreadsheet_id === '') {
             return $this->_json(array('success' => false, 'message' => 'Spreadsheet ID required.'));
         }
 
@@ -298,21 +342,15 @@ class Gs_lead_sync extends AdminController
             if (empty($headers)) {
                 return $this->_json(array('success' => false, 'message' => 'No columns found.'));
             }
-            $this->_json(array(
-                'success'   => true,
-                'columns'   => $headers,
-                'csrf_hash' => $this->security->get_csrf_hash(),
-            ));
+            $this->_json(array('success' => true, 'columns' => $headers, 'csrf_hash' => $this->security->get_csrf_hash()));
         } catch (Exception $e) {
             $this->_json(array('success' => false, 'message' => $e->getMessage()));
         }
     }
 
-    /* ──── AJAX: Test Connection ──── */
-
     public function test_connection()
     {
-        $this->_require_post();
+        if (strtolower($this->input->method()) !== 'post') { show_404(); }
         if (!is_admin()) { show_404(); }
 
         require_once GS_LEAD_SYNC_DIR . 'libraries/GoogleSheetsClient.php';
@@ -328,34 +366,16 @@ class Gs_lead_sync extends AdminController
         try {
             $client = new Gs_GoogleSheetsClient($sa_json);
             $info   = $client->get_token_for_test();
-            $this->_json(array(
-                'success'   => true,
-                'message'   => 'Google authentication succeeded.',
-                'details'   => $info,
-                'csrf_hash' => $this->security->get_csrf_hash(),
-            ));
+            $this->_json(array('success' => true, 'message' => 'Auth OK.', 'details' => $info, 'csrf_hash' => $this->security->get_csrf_hash()));
         } catch (Exception $e) {
-            $this->_json(array(
-                'success'   => false,
-                'message'   => $e->getMessage(),
-                'csrf_hash' => $this->security->get_csrf_hash(),
-            ));
+            $this->_json(array('success' => false, 'message' => $e->getMessage(), 'csrf_hash' => $this->security->get_csrf_hash()));
         }
     }
 
-    /* ──── AJAX: Sync Now ──── */
-
     public function sync_now($id)
     {
-        $this->_require_post();
+        if (strtolower($this->input->method()) !== 'post') { show_404(); }
         if (!is_admin()) { show_404(); }
-
-        $rate_key = 'gs_sync_' . (int)$id;
-        $last_hit = $this->session->userdata($rate_key);
-        if ($last_hit && (time() - (int)$last_hit) < 10) {
-            return $this->_json(array('success' => false, 'message' => 'Please wait before syncing again.'));
-        }
-        $this->session->set_userdata($rate_key, time());
 
         require_once GS_LEAD_SYNC_DIR . 'libraries/LeadMapper.php';
         require_once GS_LEAD_SYNC_DIR . 'libraries/GoogleSheetsClient.php';
@@ -366,24 +386,11 @@ class Gs_lead_sync extends AdminController
             $stats  = $engine->sync_sheet((int)$id, 'manual');
 
             if (isset($stats['error'])) {
-                return $this->_json(array(
-                    'success'   => false,
-                    'message'   => $stats['error'],
-                    'stats'     => $stats,
-                    'csrf_hash' => $this->security->get_csrf_hash(),
-                ));
+                return $this->_json(array('success' => false, 'message' => $stats['error'], 'stats' => $stats, 'csrf_hash' => $this->security->get_csrf_hash()));
             }
-            $this->_json(array(
-                'success'   => true,
-                'stats'     => $stats,
-                'csrf_hash' => $this->security->get_csrf_hash(),
-            ));
+            $this->_json(array('success' => true, 'stats' => $stats, 'csrf_hash' => $this->security->get_csrf_hash()));
         } catch (Exception $e) {
-            $this->_json(array(
-                'success'   => false,
-                'message'   => $e->getMessage(),
-                'csrf_hash' => $this->security->get_csrf_hash(),
-            ));
+            $this->_json(array('success' => false, 'message' => $e->getMessage(), 'csrf_hash' => $this->security->get_csrf_hash()));
         }
     }
 
@@ -392,16 +399,19 @@ class Gs_lead_sync extends AdminController
     private function _load_lookup_data()
     {
         $out = array();
+        $d = $this->db->db_debug;
+        $this->db->db_debug = false;
 
         $q = $this->db->get(db_prefix() . 'leads_status');
-        $out['lead_statuses'] = $q ? $q->result_array() : array();
+        $out['lead_statuses'] = ($q && $q->num_rows() >= 0) ? $q->result_array() : array();
 
         $q = $this->db->get(db_prefix() . 'leads_sources');
-        $out['lead_sources']  = $q ? $q->result_array() : array();
+        $out['lead_sources']  = ($q && $q->num_rows() >= 0) ? $q->result_array() : array();
 
         $q = $this->db->where('active', 1)->order_by('firstname', 'asc')->get(db_prefix() . 'staff');
-        $out['staff_list'] = $q ? $q->result_array() : array();
+        $out['staff_list'] = ($q && $q->num_rows() >= 0) ? $q->result_array() : array();
 
+        $this->db->db_debug = $d;
         return $out;
     }
 
@@ -413,22 +423,10 @@ class Gs_lead_sync extends AdminController
         exit;
     }
 
-    private function _require_post()
-    {
-        if (strtolower($this->input->method()) !== 'post') {
-            show_404();
-        }
-    }
-
-    /**
-     * Safety net: create tables if they don't exist.
-     * This handles the case where activation failed or tables were dropped.
-     */
     private function _ensure_tables()
     {
-        $prev = $this->db->db_debug;
+        $d = $this->db->db_debug;
         $this->db->db_debug = false;
-
         $p = db_prefix();
 
         if (!$this->db->table_exists($p . 'gs_lead_sync_sheets')) {
@@ -485,6 +483,6 @@ class Gs_lead_sync extends AdminController
             ");
         }
 
-        $this->db->db_debug = $prev;
+        $this->db->db_debug = $d;
     }
 }
