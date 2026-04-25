@@ -225,10 +225,10 @@
 
   </div><!-- /tab-content -->
     </div><!-- /col -->
-  </div><!-- /row -->
-
   </div><!-- /content -->
 </div>
+
+<?php init_tail(); ?>
 
 <script>
 // CSRF token kept in a variable so it can be refreshed from AJAX responses
@@ -274,12 +274,8 @@ $(document).on('click', '.gs-sync-now', function () {
     }).fail(function (xhr) {
         btn.prop('disabled', false).html('<i class="fa fa-refresh"></i> Sync Now');
         if (xhr.status === 403 || xhr.status === 419) {
-            if (typeof window.gsHandleSessionExpired === 'function') {
-                window.gsHandleSessionExpired(null);
-            } else {
-                alert('Session expired — reloading.');
-                setTimeout(function () { location.reload(); }, 800);
-            }
+            alert('Session expired — reloading.');
+            setTimeout(function () { location.reload(); }, 800);
             return;
         }
         var msg = 'Request failed (HTTP ' + xhr.status + ').';
@@ -291,8 +287,7 @@ $(document).on('click', '.gs-sync-now', function () {
     });
 });
 
-// Delete sheet — intercept the form submit for a confirm() prompt; the form
-// itself carries the CSRF token and POSTs to the controller.
+// Delete sheet confirm
 $(document).on('submit', '.gs-delete-form', function (e) {
     var name = $(this).find('.gs-delete-sheet').data('name');
     if (!confirm('Delete sheet configuration "' + name + '"? This cannot be undone.')) {
@@ -300,7 +295,7 @@ $(document).on('submit', '.gs-delete-form', function (e) {
     }
 });
 
-// Test Google Connection — exercises the OAuth round-trip server-side.
+// Test Google Connection
 $(document).on('click', '#gs-test-connection', function () {
     var btn      = $(this);
     var statusEl = $('#gs-test-status');
@@ -334,7 +329,7 @@ $(document).on('click', '#gs-test-connection', function () {
     }).fail(function (xhr) {
         btn.prop('disabled', false).html('<i class="fa fa-plug"></i> Test Google Connection');
         if (xhr.status === 403 || xhr.status === 419) {
-            window.gsHandleSessionExpired ? window.gsHandleSessionExpired(statusEl) : location.reload();
+            location.reload();
             return;
         }
         var msg = 'Request failed (HTTP ' + xhr.status + ').';
@@ -347,4 +342,3 @@ $(document).on('click', '#gs-test-connection', function () {
 });
 </script>
 
-<?php init_tail(); ?>
