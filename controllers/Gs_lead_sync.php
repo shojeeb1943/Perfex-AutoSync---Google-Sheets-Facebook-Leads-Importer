@@ -16,10 +16,13 @@ class Gs_lead_sync extends AdminController
 
         $data['sheets'] = $this->sheet_config_model->get_all();
 
+        $prev = $this->db->db_debug;
+        $this->db->db_debug = false;
         $q = $this->db->get(db_prefix() . 'leads_status');
         $data['lead_statuses'] = $q ? $q->result_array() : [];
         $q = $this->db->get(db_prefix() . 'leads_sources');
         $data['lead_sources']  = $q ? $q->result_array() : [];
+        $this->db->db_debug = $prev;
         $data['title']         = 'Google Sheets Lead Sync';
 
         $sa_json = get_option('gs_lead_sync_service_account_json');
@@ -98,6 +101,9 @@ class Gs_lead_sync extends AdminController
 
     private function _load_lookup_data()
     {
+        $prev = $this->db->db_debug;
+        $this->db->db_debug = false;
+
         $q = $this->db->get(db_prefix() . 'leads_status');
         $out['lead_statuses'] = $q ? $q->result_array() : [];
 
@@ -109,6 +115,7 @@ class Gs_lead_sync extends AdminController
                       ->get(db_prefix() . 'staff');
         $out['staff_list']    = $q ? $q->result_array() : [];
 
+        $this->db->db_debug = $prev;
         return $out;
     }
 

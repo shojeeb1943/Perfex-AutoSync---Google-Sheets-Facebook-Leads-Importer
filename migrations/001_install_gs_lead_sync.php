@@ -5,6 +5,11 @@ if (!function_exists('gs_lead_sync_install')) {
 function gs_lead_sync_install()
 {
     $CI = &get_instance();
+
+    if (!isset($CI->db) || !is_object($CI->db)) {
+        return;
+    }
+
     $CI->load->dbforge();
 
     // CI3 calls show_error() → exit() on any SQL failure when db_debug=TRUE.
@@ -13,7 +18,6 @@ function gs_lead_sync_install()
     $CI->db->db_debug = false;
 
     try {
-
         if (!$CI->db->table_exists(db_prefix() . 'gs_lead_sync_sheets')) {
             $CI->dbforge->add_field([
                 'id'                  => ['type' => 'INT', 'constraint' => 11, 'unsigned' => true, 'auto_increment' => true],
@@ -80,9 +84,11 @@ function gs_lead_sync_install()
             $CI->dbforge->create_table(db_prefix() . 'gs_lead_sync_logs', true);
         }
 
-    } finally {
-        $CI->db->db_debug = $prev_debug;
+    } catch (Throwable $e) {
+        log_message('error', 'gs_lead_sync install error: ' . $e->getMessage());
     }
+
+    $CI->db->db_debug = $prev_debug;
 }
 }
 

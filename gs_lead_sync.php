@@ -24,58 +24,71 @@ hooks()->add_action('admin_init',     'gs_lead_sync_ensure_schema');
 
 function gs_lead_sync_assets()
 {
-    $CI =& get_instance();
-    if (strpos($CI->uri->uri_string(), 'gs_lead_sync') === false) {
-        return;
+    try {
+        $CI =& get_instance();
+        if (!isset($CI->uri) || !is_object($CI->uri)) { return; }
+        if (strpos($CI->uri->uri_string(), 'gs_lead_sync') === false) {
+            return;
+        }
+        $module_uri = base_url('modules/gs_lead_sync/');
+        echo '<link rel="stylesheet" href="' . $module_uri . 'assets/css/gs_lead_sync.css">' . "\n";
+        echo '<script src="'                 . $module_uri . 'assets/js/gs_lead_sync.js"></script>' . "\n";
+    } catch (Throwable $e) {
+        log_message('error', 'gs_lead_sync assets hook: ' . $e->getMessage());
     }
-    $module_uri = base_url('modules/gs_lead_sync/');
-    echo '<link rel="stylesheet" href="' . $module_uri . 'assets/css/gs_lead_sync.css">' . "\n";
-    echo '<script src="'                 . $module_uri . 'assets/js/gs_lead_sync.js"></script>' . "\n";
 }
 
 function gs_lead_sync_menu()
 {
-    $CI =& get_instance();
-    if (!is_admin()) {
-        return;
+    try {
+        $CI =& get_instance();
+        if (!is_admin()) {
+            return;
+        }
+        if (!isset($CI->app_menu) || !is_object($CI->app_menu)
+            || !method_exists($CI->app_menu, 'add_sidebar_menu_item')) {
+            return;
+        }
+        $CI->app_menu->add_sidebar_menu_item('gs-lead-sync', [
+            'name'     => 'GS Lead Sync',
+            'href'     => admin_url('gs_lead_sync'),
+            'icon'     => 'fa fa-table',
+            'position' => 35,
+        ]);
+    } catch (Throwable $e) {
+        log_message('error', 'gs_lead_sync menu hook: ' . $e->getMessage());
     }
-    if (!isset($CI->app_menu) || !is_object($CI->app_menu)
-        || !method_exists($CI->app_menu, 'add_sidebar_menu_item')) {
-        return;
-    }
-    $CI->app_menu->add_sidebar_menu_item('gs-lead-sync', [
-        'name'     => 'GS Lead Sync',
-        'href'     => admin_url('gs_lead_sync'),
-        'icon'     => 'fa fa-table',
-        'position' => 35,
-    ]);
 }
 
 function gs_lead_sync_cron()
 {
-    if (get_option('gs_lead_sync_cron_enabled') != '1') {
-        return;
-    }
-
-    $CI =& get_instance();
-    $CI->load->model('gs_lead_sync/sheet_config_model');
-    $CI->load->model('gs_lead_sync/sync_log_model');
-    require_once GS_LEAD_SYNC_DIR . 'libraries/LeadMapper.php';
-    require_once GS_LEAD_SYNC_DIR . 'libraries/GoogleSheetsClient.php';
-    require_once GS_LEAD_SYNC_DIR . 'libraries/SyncEngine.php';
-
-    $interval_seconds = gs_lead_sync_interval_seconds(get_option('gs_lead_sync_cron_interval'));
-    $now              = time();
-
-    $sheets = $CI->sheet_config_model->get_active_sheets();
-    $engine = new Gs_SyncEngine();
-
-    foreach ($sheets as $sheet) {
-        $last_run = !empty($sheet['last_run_at']) ? strtotime($sheet['last_run_at']) : 0;
-        if ($last_run && ($now - $last_run) < $interval_seconds) {
-            continue;
+    try {
+        if (get_option('gs_lead_sync_cron_enabled') != '1') {
+            return;
         }
-        $engine->sync_sheet((int)$sheet['id'], 'cron');
+
+        $CI =& get_instance();
+        $CI->load->model('gs_lead_sync/sheet_config_model');
+        $CI->load->model('gs_lead_sync/sync_log_model');
+        require_once GS_LEAD_SYNC_DIR . 'libraries/LeadMapper.php';
+        require_once GS_LEAD_SYNC_DIR . 'libraries/GoogleSheetsClient.php';
+        require_once GS_LEAD_SYNC_DIR . 'libraries/SyncEngine.php';
+
+        $interval_seconds = gs_lead_sync_interval_seconds(get_option('gs_lead_sync_cron_interval'));
+        $now              = time();
+
+        $sheets = $CI->sheet_config_model->get_active_sheets();
+        $engine = new Gs_SyncEngine();
+
+        foreach ($sheets as $sheet) {
+            $last_run = !empty($sheet['last_run_at']) ? strtotime($sheet['last_run_at']) : 0;
+            if ($last_run && ($now - $last_run) < $interval_seconds) {
+                continue;
+            }
+            $engine->sync_sheet((int)$sheet['id'], 'cron');
+        }
+    } catch (Throwable $e) {
+        log_message('error', 'gs_lead_sync cron error: ' . $e->getMessage());
     }
 }
 
@@ -98,28 +111,32 @@ function gs_lead_sync_ensure_schema()
     $ran = true;
 
     $CI =& get_instance();
-
-    // Suppress db_debug so SHOW TABLES/COLUMNS never trigger show_error() → exit().
-    $prev = $CI->db->db_debug;
-    $CI->db->db_debug = false;
-
-    $table_ok = $CI->db->table_exists(db_prefix() . 'gs_lead_sync_sheets');
-
-    $CI->db->db_debug = $prev;
-
-    if (!$table_ok) {
+    if (!isset($CI->db) || !is_object($CI->db)) {
         return;
     }
 
     $prev = $CI->db->db_debug;
     $CI->db->db_debug = false;
-    $has_assignee   = $CI->db->field_exists('default_assignee', db_prefix() . 'gs_lead_sync_sheets');
-    $has_last_run   = $CI->db->field_exists('last_run_at',       db_prefix() . 'gs_lead_sync_sheets');
+
+    try {
+        $table_ok     = $CI->db->table_exists(db_prefix() . 'gs_lead_sync_sheets');
+        $has_assignee = $table_ok ? $CI->db->field_exists('default_assignee', db_prefix() . 'gs_lead_sync_sheets') : true;
+        $has_last_run = $table_ok ? $CI->db->field_exists('last_run_at',       db_prefix() . 'gs_lead_sync_sheets') : true;
+    } catch (Throwable $e) {
+        log_message('error', 'gs_lead_sync ensure_schema error: ' . $e->getMessage());
+        $CI->db->db_debug = $prev;
+        return;
+    }
+
     $CI->db->db_debug = $prev;
 
-    if (!$has_assignee || !$has_last_run) {
-        require_once GS_LEAD_SYNC_DIR . 'migrations/001_install_gs_lead_sync.php';
-        gs_lead_sync_install(); // db_debug already suppressed internally
+    if ($table_ok && (!$has_assignee || !$has_last_run)) {
+        try {
+            require_once GS_LEAD_SYNC_DIR . 'migrations/001_install_gs_lead_sync.php';
+            gs_lead_sync_install();
+        } catch (Throwable $e) {
+            log_message('error', 'gs_lead_sync migration error: ' . $e->getMessage());
+        }
     }
 }
 

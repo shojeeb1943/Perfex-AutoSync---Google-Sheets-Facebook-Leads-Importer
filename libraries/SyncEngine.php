@@ -10,7 +10,9 @@ class Gs_SyncEngine
         $this->CI =& get_instance();
         $this->CI->load->model('gs_lead_sync/sheet_config_model');
         $this->CI->load->model('gs_lead_sync/sync_log_model');
-        $this->CI->load->model('leads_model');
+        if (!isset($this->CI->leads_model)) {
+            $this->CI->load->model('leads_model');
+        }
     }
 
     public function sync_sheet($sheet_config_id, $triggered_by = 'manual')
@@ -109,7 +111,7 @@ class Gs_SyncEngine
             $lead_data = array_intersect_key($lead_data, $allowed);
 
             $this->CI->db->trans_start();
-            $perfex_lead_id = $this->CI->leads_model->add($lead_data);
+            $perfex_lead_id = $this->_add_lead($lead_data);
             if ($perfex_lead_id) {
                 $this->CI->sync_log_model->mark_imported($sheet_config_id, $row_lead_id, (int)$perfex_lead_id);
             }
@@ -117,7 +119,7 @@ class Gs_SyncEngine
 
             if ($this->CI->db->trans_status() === false || !$perfex_lead_id) {
                 $stats['rows_failed']++;
-                $stats['error_details'][] = 'Row ' . ($row_num + 2) . ': leads_model::add() failed.';
+                $stats['error_details'][] = 'Row ' . ($row_num + 2) . ': failed to insert lead into CRM.';
                 continue;
             }
 
@@ -127,6 +129,18 @@ class Gs_SyncEngine
         $this->_write_log($sheet_config_id, $triggered_by, $stats, $started_at);
         $this->CI->sheet_config_model->mark_run($sheet_config_id);
         return $stats;
+    }
+
+    private function _add_lead($lead_data)
+    {
+        $model = $this->CI->leads_model;
+        if (method_exists($model, 'add')) {
+            return $model->add($lead_data);
+        }
+        if (method_exists($model, 'add_lead')) {
+            return $model->add_lead($lead_data);
+        }
+        throw new Exception('leads_model has no add() or add_lead() method.');
     }
 
     private function _write_log($sheet_config_id, $triggered_by, $stats, $started_at)
