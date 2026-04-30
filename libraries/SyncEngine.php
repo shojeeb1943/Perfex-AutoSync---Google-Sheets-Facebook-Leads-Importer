@@ -58,8 +58,10 @@ class Gs_SyncEngine
 
         $cm = isset($config['column_mapping']) ? $config['column_mapping'] : '{}';
         $dc = isset($config['description_columns']) ? $config['description_columns'] : '[]';
+        $sr = isset($config['skip_rows']) ? $config['skip_rows'] : '[]';
         $column_mapping      = is_array(json_decode($cm, true)) ? json_decode($cm, true) : array();
         $description_columns = is_array(json_decode($dc, true)) ? json_decode($dc, true) : array();
+        $skip_row_ranges     = is_array(json_decode($sr, true)) ? json_decode($sr, true) : array();
         $id_column           = !empty($config['id_column']) ? $config['id_column'] : 'id';
         $skip_test           = (get_option('gs_lead_sync_skip_test_leads') == '1');
 
@@ -80,6 +82,15 @@ class Gs_SyncEngine
         $assignee  = !empty($config['default_assignee']) ? (int)$config['default_assignee'] : 0;
 
         foreach ($data_rows as $row_num => $row) {
+            // $row_num is 0-based within data_rows; sheet row number = $row_num + 2 (row 1 is header)
+            $sheet_row_number = $row_num + 2;
+            foreach ($skip_row_ranges as $range) {
+                if ($sheet_row_number >= $range['from'] && $sheet_row_number <= $range['to']) {
+                    $stats['rows_skipped']++;
+                    continue 2;
+                }
+            }
+
             $row_lead_id = isset($row[$id_col_index]) ? trim((string)$row[$id_col_index]) : '';
 
             if ($row_lead_id === '') {

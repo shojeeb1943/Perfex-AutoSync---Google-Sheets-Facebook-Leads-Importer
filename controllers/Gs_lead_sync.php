@@ -82,6 +82,7 @@ class Gs_lead_sync extends AdminController
             'default_assignee'    => 0,
             'column_mapping'      => '{}',
             'description_columns' => '[]',
+            'skip_rows'           => '[]',
             'id_column'           => 'id',
             'is_active'           => 0,
             'created_at'          => date('Y-m-d H:i:s'),
@@ -212,6 +213,18 @@ class Gs_lead_sync extends AdminController
         $id_column = trim((string)$this->input->post('id_column'));
         if ($id_column === '') { $id_column = 'id'; }
 
+        $raw_skip_rows = $this->input->post('skip_rows');
+        $skip_ranges   = array();
+        if (is_array($raw_skip_rows)) {
+            foreach ($raw_skip_rows as $range) {
+                $from = isset($range['from']) ? (int)$range['from'] : 0;
+                $to   = isset($range['to'])   ? (int)$range['to']   : 0;
+                if ($from >= 2 && $to >= $from) {
+                    $skip_ranges[] = array('from' => $from, 'to' => $to);
+                }
+            }
+        }
+
         $data = array(
             'name'                => trim((string)$this->input->post('name')),
             'spreadsheet_id'      => $spreadsheet_id,
@@ -222,6 +235,7 @@ class Gs_lead_sync extends AdminController
             'id_column'           => $id_column,
             'column_mapping'      => json_encode(count($filtered) > 0 ? (object)$filtered : new stdClass()),
             'description_columns' => json_encode(array_values($desc_cols)),
+            'skip_rows'           => json_encode($skip_ranges),
             'is_active'           => $this->input->post('is_active') ? 1 : 0,
         );
 
@@ -442,6 +456,7 @@ class Gs_lead_sync extends AdminController
                     `default_assignee`    INT(11) NOT NULL DEFAULT 0,
                     `column_mapping`      TEXT NULL,
                     `description_columns` TEXT NULL,
+                    `skip_rows`           TEXT NULL,
                     `id_column`           VARCHAR(100) NOT NULL DEFAULT 'id',
                     `is_active`           TINYINT(1) NOT NULL DEFAULT 1,
                     `last_run_at`         DATETIME NULL DEFAULT NULL,
@@ -457,6 +472,9 @@ class Gs_lead_sync extends AdminController
             }
             if (!$this->db->field_exists('last_run_at', $t)) {
                 $this->db->query("ALTER TABLE `{$t}` ADD COLUMN `last_run_at` DATETIME NULL DEFAULT NULL AFTER `is_active`");
+            }
+            if (!$this->db->field_exists('skip_rows', $t)) {
+                $this->db->query("ALTER TABLE `{$t}` ADD COLUMN `skip_rows` TEXT NULL DEFAULT NULL AFTER `description_columns`");
             }
         }
 

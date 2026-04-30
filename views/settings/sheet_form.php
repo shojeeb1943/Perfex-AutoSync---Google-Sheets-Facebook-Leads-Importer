@@ -171,6 +171,56 @@
         </div>
 
         <div class="panel panel-default">
+          <div class="panel-heading"><h4 class="panel-title">Row Skip Ranges</h4></div>
+          <div class="panel-body">
+            <p class="text-muted">
+              Specify sheet row numbers to skip during sync (e.g. rows already imported).
+              Row 1 is always the header. First data row is row 2.
+            </p>
+            <table class="table table-condensed" id="gs-skip-ranges-table">
+              <thead>
+                <tr>
+                  <th style="width:40%">From Row <span class="text-danger">*</span></th>
+                  <th style="width:40%">To Row <span class="text-danger">*</span></th>
+                  <th style="width:20%"></th>
+                </tr>
+              </thead>
+              <tbody id="gs-skip-ranges-body">
+                <?php
+                $s_skip_rows = array();
+                if (!empty($sheet['skip_rows'])) {
+                    $decoded = json_decode($sheet['skip_rows'], true);
+                    if (is_array($decoded)) { $s_skip_rows = $decoded; }
+                }
+                foreach ($s_skip_rows as $i => $range):
+                ?>
+                <tr class="gs-skip-range-row">
+                  <td>
+                    <input type="number" name="skip_rows[<?php echo $i; ?>][from]"
+                           class="form-control" min="2" placeholder="e.g. 2"
+                           value="<?php echo (int)$range['from']; ?>">
+                  </td>
+                  <td>
+                    <input type="number" name="skip_rows[<?php echo $i; ?>][to]"
+                           class="form-control" min="2" placeholder="e.g. 100"
+                           value="<?php echo (int)$range['to']; ?>">
+                  </td>
+                  <td>
+                    <button type="button" class="btn btn-danger btn-sm gs-remove-range">
+                      <i class="fa fa-trash"></i>
+                    </button>
+                  </td>
+                </tr>
+                <?php endforeach; ?>
+              </tbody>
+            </table>
+            <button type="button" id="gs-add-range" class="btn btn-default btn-sm">
+              <i class="fa fa-plus"></i> Add Range
+            </button>
+          </div>
+        </div>
+
+        <div class="panel panel-default">
           <div class="panel-heading"><h4 class="panel-title">Unique Row ID Column</h4></div>
           <div class="panel-body">
             <div class="form-group">
@@ -212,6 +262,22 @@
 var GS_CSRF_NAME  = '<?php echo $csrf_name; ?>';
 var GS_CSRF_HASH  = '<?php echo $csrf_hash; ?>';
 var GS_DETECT_URL = '<?php echo admin_url("gs_lead_sync/detect_columns"); ?>';
+
+var gsSkipRangeIndex = <?php echo max(count($s_skip_rows), 0); ?>;
+
+$('#gs-add-range').on('click', function () {
+    var i = gsSkipRangeIndex++;
+    var row = '<tr class="gs-skip-range-row">' +
+        '<td><input type="number" name="skip_rows[' + i + '][from]" class="form-control" min="2" placeholder="e.g. 2"></td>' +
+        '<td><input type="number" name="skip_rows[' + i + '][to]" class="form-control" min="2" placeholder="e.g. 100"></td>' +
+        '<td><button type="button" class="btn btn-danger btn-sm gs-remove-range"><i class="fa fa-trash"></i></button></td>' +
+        '</tr>';
+    $('#gs-skip-ranges-body').append(row);
+});
+
+$(document).on('click', '.gs-remove-range', function () {
+    $(this).closest('tr.gs-skip-range-row').remove();
+});
 
 $('#gs-detect-columns').on('click', function () {
     var btn      = $(this);

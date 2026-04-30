@@ -112,6 +112,7 @@ function gs_lead_sync_activate()
             `default_assignee`    INT(11) NOT NULL DEFAULT 0,
             `column_mapping`      TEXT NULL,
             `description_columns` TEXT NULL,
+            `skip_rows`           TEXT NULL,
             `id_column`           VARCHAR(100) NOT NULL DEFAULT 'id',
             `is_active`           TINYINT(1) NOT NULL DEFAULT 1,
             `last_run_at`         DATETIME NULL DEFAULT NULL,
@@ -127,6 +128,9 @@ function gs_lead_sync_activate()
     }
     if (!$CI->db->field_exists('last_run_at', $p . 'gs_lead_sync_sheets')) {
         $CI->db->query("ALTER TABLE `{$p}gs_lead_sync_sheets` ADD COLUMN `last_run_at` DATETIME NULL DEFAULT NULL AFTER `is_active`");
+    }
+    if (!$CI->db->field_exists('skip_rows', $p . 'gs_lead_sync_sheets')) {
+        $CI->db->query("ALTER TABLE `{$p}gs_lead_sync_sheets` ADD COLUMN `skip_rows` TEXT NULL DEFAULT NULL AFTER `description_columns`");
     }
 
     // Table 2: dedup tracker
